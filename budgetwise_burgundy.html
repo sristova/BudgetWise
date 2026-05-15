@@ -1,0 +1,141 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.preview-wrap { background: #070508; border-radius: 16px; padding: 20px; }
+.preview-screen { background: #0D090C; border-radius: 16px; padding: 18px; max-width: 320px; margin: 0 auto; }
+
+.p-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.p-title { color: #F5EEE8; font-size: 16px; font-weight: 500; letter-spacing: -0.2px; }
+.p-sub { color: #5C4A50; font-size: 12px; margin-top: 2px; }
+.p-avatar { width: 34px; height: 34px; border-radius: 50%; background: #1E0D12; border: 0.5px solid #5C1A28; display: flex; align-items: center; justify-content: center; }
+.p-avatar i { color: #A0263A; font-size: 16px; }
+
+.balance-card { background: #120810; border-radius: 14px; padding: 18px; margin-bottom: 12px; border: 0.5px solid #3D1020; }
+.balance-label { color: #5C4A50; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+.balance-amount { color: #F5EEE8; font-size: 30px; font-weight: 500; letter-spacing: -0.5px; }
+.balance-change { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.balance-pos { color: #C4967A; font-size: 12px; }
+.balance-lbl { color: #5C4A50; font-size: 12px; }
+
+.stats-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.stat-card { flex: 1; background: #120810; border-radius: 10px; padding: 12px; border: 0.5px solid #3D1020; }
+.stat-label { color: #5C4A50; font-size: 11px; margin-bottom: 5px; }
+.stat-val { font-size: 14px; font-weight: 500; }
+.stat-val.inc { color: #C4967A; }
+.stat-val.exp { color: #A0263A; }
+.stat-val.sav { color: #8C6A5A; }
+
+.section-title { color: #5C4A50; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }
+
+.category-row { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.cat-item { display: flex; align-items: center; gap: 10px; }
+.cat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.cat-name { color: #C8B8B0; font-size: 13px; flex: 1; }
+.cat-bar-wrap { width: 72px; height: 3px; background: #251018; border-radius: 2px; }
+.cat-bar { height: 3px; border-radius: 2px; }
+.cat-amt { color: #5C4A50; font-size: 12px; min-width: 52px; text-align: right; }
+
+.p-nav { display: flex; justify-content: space-around; padding-top: 14px; border-top: 0.5px solid #251018; }
+.p-nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.p-nav-item i { font-size: 18px; color: #3A1820; }
+.p-nav-item i.active { color: #A0263A; }
+.p-nav-item span { font-size: 10px; color: #3A1820; }
+.p-nav-item span.active { color: #A0263A; }
+
+.swatch-section { margin-top: 20px; }
+.swatch-label { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 8px; }
+.swatch-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.swatch { flex: 1; height: 44px; border-radius: 8px; display: flex; align-items: flex-end; padding: 5px 7px; }
+.swatch span { font-size: 10px; font-weight: 500; opacity: 0.85; }
+</style>
+
+<h2 class="sr-only">BudgetWise dark red burgundy палета и UI preview</h2>
+
+<div class="preview-wrap">
+  <div class="preview-screen">
+    <div class="p-header">
+      <div>
+        <div class="p-title">Добро утро, Марко</div>
+        <div class="p-sub">Мај 2025</div>
+      </div>
+      <div class="p-avatar"><i class="ti ti-user" aria-hidden="true"></i></div>
+    </div>
+
+    <div class="balance-card">
+      <div class="balance-label">Вкупен буџет</div>
+      <div class="balance-amount">45.200 МКД</div>
+      <div class="balance-change">
+        <i class="ti ti-trending-up" style="font-size:13px;color:#C4967A" aria-hidden="true"></i>
+        <span class="balance-pos">+12% </span>
+        <span class="balance-lbl">од минатиот месец</span>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Приходи</div>
+        <div class="stat-val inc">32.000</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Трошоци</div>
+        <div class="stat-val exp">18.750</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Заштедено</div>
+        <div class="stat-val sav">13.250</div>
+      </div>
+    </div>
+
+    <div class="section-title">Категории</div>
+    <div class="category-row">
+      <div class="cat-item">
+        <div class="cat-dot" style="background:#A0263A"></div>
+        <div class="cat-name">Храна</div>
+        <div class="cat-bar-wrap"><div class="cat-bar" style="width:72%;background:#A0263A"></div></div>
+        <div class="cat-amt">6.840 МКД</div>
+      </div>
+      <div class="cat-item">
+        <div class="cat-dot" style="background:#7A1A2E"></div>
+        <div class="cat-name">Транспорт</div>
+        <div class="cat-bar-wrap"><div class="cat-bar" style="width:40%;background:#7A1A2E"></div></div>
+        <div class="cat-amt">3.800 МКД</div>
+      </div>
+      <div class="cat-item">
+        <div class="cat-dot" style="background:#C4967A"></div>
+        <div class="cat-name">Забава</div>
+        <div class="cat-bar-wrap"><div class="cat-bar" style="width:28%;background:#C4967A"></div></div>
+        <div class="cat-amt">2.650 МКД</div>
+      </div>
+      <div class="cat-item">
+        <div class="cat-dot" style="background:#8C6A5A"></div>
+        <div class="cat-name">Сметки</div>
+        <div class="cat-bar-wrap"><div class="cat-bar" style="width:55%;background:#8C6A5A"></div></div>
+        <div class="cat-amt">5.200 МКД</div>
+      </div>
+    </div>
+
+    <div class="p-nav">
+      <div class="p-nav-item"><i class="ti ti-home active" aria-hidden="true"></i><span class="active">Дома</span></div>
+      <div class="p-nav-item"><i class="ti ti-chart-bar" aria-hidden="true"></i><span>Анализа</span></div>
+      <div class="p-nav-item"><i class="ti ti-plus" aria-hidden="true"></i><span>Додај</span></div>
+      <div class="p-nav-item"><i class="ti ti-target" aria-hidden="true"></i><span>Цели</span></div>
+      <div class="p-nav-item"><i class="ti ti-settings" aria-hidden="true"></i><span>Опции</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="swatch-section">
+  <div class="swatch-label">Палета за React Native</div>
+  <div class="swatch-row">
+    <div class="swatch" style="background:#070508;border:0.5px solid #251018"><span style="color:#3A1820">#070508</span></div>
+    <div class="swatch" style="background:#0D090C;border:0.5px solid #251018"><span style="color:#3A1820">#0D090C</span></div>
+    <div class="swatch" style="background:#120810;border:0.5px solid #3D1020"><span style="color:#5C2030">#120810</span></div>
+    <div class="swatch" style="background:#3D1020;border:0.5px solid #5C1A28"><span style="color:#C08090">#3D1020</span></div>
+  </div>
+  <div class="swatch-row">
+    <div class="swatch" style="background:#A0263A"><span style="color:#F5EEE8">#A0263A</span></div>
+    <div class="swatch" style="background:#7A1A2E"><span style="color:#F5EEE8">#7A1A2E</span></div>
+    <div class="swatch" style="background:#C4967A"><span style="color:#120810">#C4967A</span></div>
+    <div class="swatch" style="background:#F5EEE8;border:0.5px solid #DDD0C8"><span style="color:#3D1020">#F5EEE8</span></div>
+  </div>
+</div>
