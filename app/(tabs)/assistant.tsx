@@ -11,7 +11,7 @@ const C = {
 };
 
 // ⚠️ SAMO ZA DEMO — v produkciji - kljuc na backend!
-const GROQ_API_KEY = 'groq_api_kluc';
+const GROQ_API_KEY = 'kluc_tuka';
 
 const SYSTEM_PROMPT = `Si finančni asistent v mobilni aplikaciji BudgetWise. Govoriš slovensko, si prijazen in koncizen.
 Trenutno nimaš dostopa do pravih podatkov uporabnika — to je demo verzija.
