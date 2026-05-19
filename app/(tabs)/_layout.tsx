@@ -25,11 +25,41 @@ export default function TabLayout() {
         tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Domov', tabBarIcon: ({ color, size }) => <TabIcon name="home" color={color} size={size} /> }} />
-      <Tabs.Screen name="transactions" options={{ title: 'Transakcije', tabBarIcon: ({ color, size }) => <TabIcon name="list" color={color} size={size} /> }} />
-      <Tabs.Screen name="goals" options={{ title: 'Cilji', tabBarIcon: ({ color, size }) => <TabIcon name="flag" color={color} size={size} /> }} />
-      <Tabs.Screen name="assistant" options={{ title: 'Asistent', tabBarIcon: ({ color, size }) => <TabIcon name="chatbubble-ellipses" color={color} size={size} /> }} />
-      <Tabs.Screen name="report" options={{ title: 'Poročilo', tabBarIcon: ({ color, size }) => <TabIcon name="bar-chart" color={color} size={size} /> }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Domov',
+          tabBarIcon: ({ color, size }) => <TabIcon name="home" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="transactions"
+        options={{
+          title: 'Transakcije',
+          tabBarIcon: ({ color, size }) => <TabIcon name="list" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="goals"
+        options={{
+          title: 'Cilji',
+          tabBarIcon: ({ color, size }) => <TabIcon name="flag" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="assistant"
+        options={{
+          title: 'Asistent',
+          tabBarIcon: ({ color, size }) => <TabIcon name="chatbubble-ellipses" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="report"
+        options={{
+          title: 'Poročilo',
+          tabBarIcon: ({ color, size }) => <TabIcon name="bar-chart" color={color} size={size} />,
+        }}
+      />
     </Tabs>
   );
 }

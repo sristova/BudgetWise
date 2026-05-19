@@ -34,8 +34,17 @@ const C = {
   inputBg: "#0F0710",
 };
 
-// ─── GROQ API KEY ────────────────────────────────────────────────────────────
-const GROQ_API_KEY = "kluc_tuka";
+// ─── Backend URL — nastavi v svojem .env ──────────────────────────────────────
+// Expo: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000
+const API_URL = "http://10.5.0.2:3000";
+
+// ─── Pomožna funkcija za JWT token ───────────────────────────────────────────
+// Prilagodi glede na to, kje shranjuješ token (AsyncStorage, SecureStore, context...)
+
+//HARDCODED ZA DEMO!!!!!!!
+async function getAuthToken(): Promise<string> {
+  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OGYyYWU1MC0xOTU2LTQxYTItODQ1Ni0wNDMxYWRiZDJkMGEiLCJlbWFpbCI6ImRlbW9AYnVkZ2V0d2lzZS5hcHAiLCJpYXQiOjE3NzkxOTIzMTIsImV4cCI6MTc3OTE5MzIxMn0.nbnWiH-QcnwYQsebYXDXOMuEHYLNOSr5IBYT6C_vCJA";
+}
 
 // ─── Static Data ─────────────────────────────────────────────────────────────
 const FILTERS = [
@@ -82,76 +91,32 @@ interface ParsedInvoice {
   category: string;
 }
 
-// ─── GROQ VISION ─────────────────────────────────────────────────────────────
-async function parseReceiptWithGroqVision(
-  base64Image: string,
-): Promise<ParsedInvoice> {
-  const response = await fetch(
-    "https://api.groq.com/openai/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
-        temperature: 0,
-        max_tokens: 300,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `
-Analiziraj sliko računa.
+// ─── Receipt parsing — kliče BACKEND, ne Groqa direktno ──────────────────────
+async function parseReceiptViaBackend(base64Image: string): Promise<ParsedInvoice> {
+  const token = await getAuthToken();
 
-Vrni SAMO JSON.
-
-Format:
-{
-  "merchant": "",
-  "amount": "",
-  "date": "",
-  "category": ""
-}
-
-Pravila:
-- amount brez €
-- category mora biti ena od: Hrana, Restavracije, Kavarne, Prevoz, Zabava, Zdravje, Oblačila, Sport, Potovanje, Ostalo
-                `,
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/jpeg;base64,${base64Image}`,
-                },
-              },
-            ],
-          },
-        ],
-      }),
+  const response = await fetch(`${API_URL}/api/v1/ai-chat/parse-receipt`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-  );
+    body: JSON.stringify({ imageBase64: base64Image }),
+  });
 
   if (!response.ok) {
-    throw new Error("Groq API napaka");
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.message ?? "Napaka pri skeniranju računa");
   }
 
   const data = await response.json();
-
-  const content = data.choices?.[0]?.message?.content ?? "{}";
-
-  const clean = content.replace(/```json|```/g, "").trim();
-
-  const parsed = JSON.parse(clean);
+  const parsed = data?.data;
 
   return {
-    merchant: parsed.merchant ?? "",
-    amount: String(parsed.amount ?? ""),
-    date: parsed.date ?? new Date().toLocaleDateString("sl-SI"),
-    category: parsed.category ?? "Ostalo",
+    merchant: parsed?.merchant ?? "",
+    amount: String(parsed?.amount ?? ""),
+    date: parsed?.date ?? new Date().toLocaleDateString("sl-SI"),
+    category: parsed?.category ?? "Ostalo",
   };
 }
 
@@ -531,7 +496,8 @@ export default function TransactionsScreen() {
         throw new Error("Ni base64 slike");
       }
 
-      const parsed = await parseReceiptWithGroqVision(asset.base64);
+      // Kliče backend, ki skliče Groq — ključ ostane na strežniku
+      const parsed = await parseReceiptViaBackend(asset.base64);
 
       setParsedInvoice({
         merchant: parsed.merchant,

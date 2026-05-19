@@ -1,0 +1,49 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: budgetwise_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: budgetwise_user
+      POSTGRES_PASSWORD: yourpassword
+      POSTGRES_DB: budgetwise_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U budgetwise_user -d budgetwise_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: budgetwise_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
+  api:
+    build: .
+    container_name: budgetwise_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://budgetwise_user:yourpassword@postgres:5432/budgetwise_db?schema=public
+      REDIS_URL: redis://redis:6379
+    ports:
+      - '3000:3000'
+    command: >
+      sh -c "npx prisma migrate deploy && node dist/server.js"
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,249 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum BudgetPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  CANCELLED
+}
+
+enum NotificationType {
+  BUDGET_ALERT
+  GOAL_REMINDER
+  BILL_REMINDER
+  WEEKLY_REPORT
+  MONTHLY_REPORT
+  ACHIEVEMENT
+}
+
+enum Currency {
+  EUR
+  USD
+  GBP
+  CHF
+  HRK
+  RSD
+  BAM
+}
+
+// ─── USERS ───────────────────────────────────────────────────────────────────
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  passwordHash     String    @map("password_hash")
+  firstName        String    @map("first_name")
+  lastName         String    @map("last_name")
+  avatarUrl        String?   @map("avatar_url")
+  currency         Currency  @default(EUR)
+  timezone         String    @default("Europe/Ljubljana")
+  locale           String    @default("sl-SI")
+  isEmailVerified  Boolean   @default(false) @map("is_email_verified")
+  isActive         Boolean   @default(true) @map("is_active")
+  lastLoginAt      DateTime? @map("last_login_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  refreshTokens    RefreshToken[]
+  categories       Category[]
+  transactions     Transaction[]
+  budgets          Budget[]
+  goals            Goal[]
+  notifications    Notification[]
+  aiChats          AiChat[]
+  reports          Report[]
+
+  @@map("users")
+  @@index([email])
+}
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceInfo  String?   @map("device_info")
+  ipAddress   String?   @map("ip_address")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("refresh_tokens")
+  @@index([userId])
+  @@index([token])
+}
+
+// ─── CATEGORIES ───────────────────────────────────────────────────────────────
+
+model Category {
+  id        String          @id @default(uuid())
+  userId    String          @map("user_id")
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  icon      String          @default("💰")
+  color     String          @default("#A0263A")
+  type      TransactionType
+  isDefault Boolean         @default(false) @map("is_default")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@map("categories")
+  @@index([userId])
+  @@index([userId, type])
+}
+
+// ─── TRANSACTIONS (expenses + income unified) ─────────────────────────────────
+
+model Transaction {
+  id          String          @id @default(uuid())
+  userId      String          @map("user_id")
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId  String?         @map("category_id")
+  category    Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  type        TransactionType
+  amount      Decimal         @db.Decimal(15, 2)
+  currency    Currency        @default(EUR)
+  description String
+  note        String?
+  date        DateTime        @db.Date
+  isRecurring Boolean         @default(false) @map("is_recurring")
+  recurringId String?         @map("recurring_id")
+  tags        String[]        @default([])
+  metadata    Json?           // flexible extra data
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@map("transactions")
+  @@index([userId])
+  @@index([userId, date])
+  @@index([userId, type])
+  @@index([userId, categoryId])
+  @@index([date])
+}
+
+// ─── BUDGETS ─────────────────────────────────────────────────────────────────
+
+model Budget {
+  id          String       @id @default(uuid())
+  userId      String       @map("user_id")
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId  String?      @map("category_id")
+  category    Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  name        String
+  amount      Decimal      @db.Decimal(15, 2)
+  currency    Currency     @default(EUR)
+  period      BudgetPeriod @default(MONTHLY)
+  startDate   DateTime     @map("start_date") @db.Date
+  endDate     DateTime?    @map("end_date") @db.Date
+  alertAt     Decimal      @default(80) @db.Decimal(5, 2) @map("alert_at") // % threshold
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@map("budgets")
+  @@index([userId])
+  @@index([userId, isActive])
+}
+
+// ─── SAVINGS GOALS ───────────────────────────────────────────────────────────
+
+model Goal {
+  id            String     @id @default(uuid())
+  userId        String     @map("user_id")
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  icon          String     @default("🎯")
+  targetAmount  Decimal    @db.Decimal(15, 2) @map("target_amount")
+  currentAmount Decimal    @default(0) @db.Decimal(15, 2) @map("current_amount")
+  currency      Currency   @default(EUR)
+  deadline      DateTime?  @db.Date
+  status        GoalStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  @@map("goals")
+  @@index([userId])
+  @@index([userId, status])
+}
+
+// ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean          @default(false) @map("is_read")
+  sentAt    DateTime?        @map("sent_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@map("notifications")
+  @@index([userId])
+  @@index([userId, isRead])
+}
+
+// ─── AI CHAT HISTORY ─────────────────────────────────────────────────────────
+
+model AiChat {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   // "user" | "assistant"
+  content   String
+  tokens    Int?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ai_chats")
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+// ─── REPORTS (cached analytics) ──────────────────────────────────────────────
+
+model Report {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // "monthly" | "yearly" | "category"
+  period    String   // "2024-01", "2024", etc.
+  data      Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("reports")
+  @@unique([userId, type, period])
+  @@index([userId])
+}

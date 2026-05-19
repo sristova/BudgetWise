@@ -10,13 +10,9 @@ const C = {
   text1:'#F5EEE8', text2:'#C8B8B0', text3:'#5C4A50',
 };
 
-// ⚠️ SAMO ZA DEMO — v produkciji - kljuc na backend!
-const GROQ_API_KEY = 'kluc_tuka';
-
-const SYSTEM_PROMPT = `Si finančni asistent v mobilni aplikaciji BudgetWise. Govoriš slovensko, si prijazen in koncizen.
-Trenutno nimaš dostopa do pravih podatkov uporabnika — to je demo verzija.
-Odgovarjaj splošno na finančna vprašanja, omeni da bo prava verzija imela dostop do njihovih transakcij in ciljev.
-Odgovarjaj kratko (2-4 stavki) in praktično.`;
+// ─── Backend URL — nastavi v svojem .env ──────────────────────────────────────
+// Expo: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000
+const API_URL = "http://10.5.0.2:3000";
 
 const SUGGESTIONS = [
   { id:1, icon:'help-circle-outline' as const, text:'Ali si lahko privoščim PS5 naslednji mesec?' },
@@ -26,6 +22,14 @@ const SUGGESTIONS = [
 ];
 
 type Msg = { id:number; role:'user'|'ai'; text:string };
+
+// ─── Pomožna funkcija za JWT token ───────────────────────────────────────────
+// Prilagodi glede na to, kje shranjuješ token (AsyncStorage, SecureStore, context...)
+
+//HARDCODED ZA DEMO!!!!!!!
+async function getAuthToken(): Promise<string> {
+  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OGYyYWU1MC0xOTU2LTQxYTItODQ1Ni0wNDMxYWRiZDJkMGEiLCJlbWFpbCI6ImRlbW9AYnVkZ2V0d2lzZS5hcHAiLCJpYXQiOjE3NzkxOTIzMTIsImV4cCI6MTc3OTE5MzIxMn0.nbnWiH-QcnwYQsebYXDXOMuEHYLNOSr5IBYT6C_vCJA";
+}
 
 export default function AssistantScreen() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -39,48 +43,36 @@ export default function AssistantScreen() {
     if (!msg || loading) return;
 
     const userMsg: Msg = { id: Date.now(), role: 'user', text: msg };
-    const newMsgs = [...msgs, userMsg];
-    setMsgs(newMsgs);
+    setMsgs(prev => [...prev, userMsg]);
     setInput('');
     setLoading(true);
     setTimeout(() => ref.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const token = await getAuthToken();
+
+      const response = await fetch(`${API_URL}/api/v1/ai-chat/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
+          'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: 512,
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            ...newMsgs.map(m => ({
-              role: m.role === 'user' ? 'user' : 'assistant',
-              content: m.text,
-            })),
-          ],
-        }),
+        body: JSON.stringify({ message: msg }),
       });
 
       const data = await response.json();
 
-      if (data.error) {
-        throw new Error(data.error.message);
+      if (!response.ok) {
+        throw new Error(data?.message ?? 'Napaka strežnika');
       }
 
-      const aiText =
-        data.choices?.[0]?.message?.content ??
-        'Prišlo je do napake. Poskusi znova.';
-
+      const aiText = data?.data?.message?.content ?? 'Prišlo je do napake. Poskusi znova.';
       setMsgs(p => [...p, { id: Date.now(), role: 'ai', text: aiText }]);
     } catch (err: any) {
       setMsgs(p => [...p, {
         id: Date.now(),
         role: 'ai',
-        text: `❌ Napaka: ${err?.message ?? 'Preveri internet in API ključ.'}`,
+        text: `❌ Napaka: ${err?.message ?? 'Preveri internet in prijavo.'}`,
       }]);
     } finally {
       setLoading(false);
@@ -104,29 +96,15 @@ export default function AssistantScreen() {
           <Ionicons name="chatbubble-ellipses" size={22} color={C.text1} />
           <View style={{ flex:1 }}>
             <Text style={{ fontSize:16, fontWeight:'500', color:C.text1 }}>AI finančni asistent</Text>
-            <Text style={{ fontSize:12, color:'rgba(245,238,232,0.75)', marginTop:2 }}>Demo verzija · Groq</Text>
-          </View>
-          <View style={{ backgroundColor:'rgba(0,0,0,0.2)', borderRadius:8, paddingHorizontal:8, paddingVertical:4 }}>
-            <Text style={{ fontSize:10, color:'rgba(245,238,232,0.75)' }}>DEMO</Text>
+            <Text style={{ fontSize:12, color:'rgba(245,238,232,0.75)', marginTop:2 }}>BudgetWise · Groq</Text>
           </View>
         </View>
 
         <ScrollView ref={ref} showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow:1 }}>
 
-          {/* Demo opozorilo */}
-          <View style={{
-            margin:16, backgroundColor:C.card, borderRadius:12, padding:12,
-            borderWidth:0.5, borderColor:C.border2, flexDirection:'row', gap:10,
-          }}>
-            <Ionicons name="information-circle-outline" size={18} color={C.warm} />
-            <Text style={{ fontSize:12, color:C.text3, flex:1, lineHeight:18 }}>
-              Demo verzija — asistent nima tvojih podatkov. V pravi verziji bo videl tvoje transakcije, saldo in cilje.
-            </Text>
-          </View>
-
           {/* Predlogi — vidni samo na začetku */}
           {msgs.length === 0 && (
-            <View style={{ paddingHorizontal:16, gap:8, marginBottom:8 }}>
+            <View style={{ paddingHorizontal:16, gap:8, marginTop:16, marginBottom:8 }}>
               <Text style={{ fontSize:11, color:C.text3, letterSpacing:0.08, textTransform:'uppercase', marginBottom:4 }}>
                 PREDLAGANA VPRAŠANJA
               </Text>
