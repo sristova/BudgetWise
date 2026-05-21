@@ -135,8 +135,9 @@ export async function logout(req: Request, res: Response) {
   const { refreshToken: token } = req.body;
 
   if (token) {
+    // Revoke samo po refresh tokenu, brez da rabimo access token
     await prisma.refreshToken.updateMany({
-      where: { token, userId: req.user!.id },
+      where: { token },
       data: { revokedAt: new Date() },
     });
   }

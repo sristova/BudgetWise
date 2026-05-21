@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,8 +15,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { transactionsApi, categoriesApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
-// ─── Theme ───────────────────────────────────────────────────────────────────
+// UVOZ URADNEGA API KLIENTA 
+import { api } from '@/lib/api';
+
+// ─── Theme 
 const C = {
   bg1: "#070508",
   bg2: "#0D090C",
@@ -34,19 +39,7 @@ const C = {
   inputBg: "#0F0710",
 };
 
-// ─── Backend URL — nastavi v svojem .env ──────────────────────────────────────
-// Expo: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000
-const API_URL = "http://10.5.0.2:3000";
-
-// ─── Pomožna funkcija za JWT token ───────────────────────────────────────────
-// Prilagodi glede na to, kje shranjuješ token (AsyncStorage, SecureStore, context...)
-
-//HARDCODED ZA DEMO!!!!!!!
-async function getAuthToken(): Promise<string> {
-  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OGYyYWU1MC0xOTU2LTQxYTItODQ1Ni0wNDMxYWRiZDJkMGEiLCJlbWFpbCI6ImRlbW9AYnVkZ2V0d2lzZS5hcHAiLCJpYXQiOjE3NzkxOTIzMTIsImV4cCI6MTc3OTE5MzIxMn0.nbnWiH-QcnwYQsebYXDXOMuEHYLNOSr5IBYT6C_vCJA";
-}
-
-// ─── Static Data ─────────────────────────────────────────────────────────────
+// ─── Static Data 
 const FILTERS = [
   "Vse",
   "Hrana",
@@ -74,7 +67,7 @@ const DEFAULT_COLLECTIONS = [
   "Ostalo",
 ];
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types 
 interface InvoiceData {
   merchant: string;
   amount: string;
@@ -91,26 +84,14 @@ interface ParsedInvoice {
   category: string;
 }
 
-// ─── Receipt parsing — kliče BACKEND, ne Groqa direktno ──────────────────────
+// ─── Receipt parsing — Kliče backend preko uradne instance 
 async function parseReceiptViaBackend(base64Image: string): Promise<ParsedInvoice> {
-  const token = await getAuthToken();
-
-  const response = await fetch(`${API_URL}/api/v1/ai-chat/parse-receipt`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ imageBase64: base64Image }),
+  //  Uporabimo uradni 'api' objekt, ki sam doda Bearer žeton in ustrezen IP naslov!
+  const response = await api.post("/ai-chat/parse-receipt", { 
+    imageBase64: base64Image 
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err?.message ?? "Napaka pri skeniranju računa");
-  }
-
-  const data = await response.json();
-  const parsed = data?.data;
+  const parsed = response.data?.data;
 
   return {
     merchant: parsed?.merchant ?? "",
@@ -120,7 +101,7 @@ async function parseReceiptViaBackend(base64Image: string): Promise<ParsedInvoic
   };
 }
 
-// ─── Filter Bar ──────────────────────────────────────────────────────────────
+// ─── Filter Bar 
 function FilterBar({
   active,
   setActive,
@@ -166,7 +147,7 @@ function FilterBar({
   );
 }
 
-// ─── Transaction Card ────────────────────────────────────────────────────────
+// ─── Transaction Card 
 function TxCard({ tx }: { tx: any }) {
   return (
     <View
@@ -228,7 +209,7 @@ function TxCard({ tx }: { tx: any }) {
   );
 }
 
-// ─── Invoice Modal ───────────────────────────────────────────────────────────
+// ─── Invoice Modal 
 function InvoiceFormModal({
   visible,
   data,
@@ -417,31 +398,39 @@ function InvoiceFormModal({
   );
 }
 
-// ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
+// ─── MAIN SCREEN 
 export default function TransactionsScreen() {
   const [active, setActive] = useState("Vse");
-
   const [transactions, setTransactions] = useState<any[]>([]);
-
   const [collections] = useState(DEFAULT_COLLECTIONS);
-
   const [scanning, setScanning] = useState(false);
-
   const [formVisible, setFormVisible] = useState(false);
-
   const [parsedInvoice, setParsedInvoice] = useState<Partial<InvoiceData>>({});
+  const { isReady, isAuthenticated } = useAuth();
 
   const filterTx = () => {
     if (active === "Vse") return transactions;
-
     return transactions.filter(
       (t) => t.collection === active || t.cat?.includes(active),
     );
   };
 
+  const fetchTransactions = useCallback(async () => {
+  if (!isReady || !isAuthenticated) return;
+  try {
+    const res = await transactionsApi.getAll();
+    setTransactions(res.data ?? []);
+  } catch (err) {
+    console.error('Napaka pri nalaganju transakcij:', err);
+  }
+}, [isReady, isAuthenticated]);
+
+useEffect(() => {
+  fetchTransactions();
+}, [fetchTransactions]);
+
   const handleScan = async () => {
     const galleryPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
     const camPerm = await ImagePicker.requestCameraPermissionsAsync();
 
     Alert.alert("Skeniraj račun", "Izberi vir slike", [
@@ -496,7 +485,6 @@ export default function TransactionsScreen() {
         throw new Error("Ni base64 slike");
       }
 
-      // Kliče backend, ki skliče Groq — ključ ostane na strežniku
       const parsed = await parseReceiptViaBackend(asset.base64);
 
       setParsedInvoice({
@@ -509,34 +497,30 @@ export default function TransactionsScreen() {
       });
 
       setFormVisible(true);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-
-      Alert.alert("Napaka", "Računa ni bilo mogoče analizirati.");
+      Alert.alert("Napaka", e?.message ?? "Računa ni bilo mogoče analizirati.");
     } finally {
       setScanning(false);
     }
   };
 
-  const handleSave = (data: InvoiceData) => {
-    const amountNum = parseFloat(data.amount || "0");
-
-    const newTx = {
-      id: Date.now(),
-      name: data.merchant,
-      cat: `${data.category}`,
-      amount: `-€${amountNum.toFixed(2).replace(".", ",")}`,
-      neg: true,
-      icon: "receipt",
-      ibg: "#2A0D14",
-      ic: C.warm,
-      collection: data.collection,
-    };
-
-    setTransactions((prev) => [newTx, ...prev]);
-
+  const handleSave = async (data: InvoiceData) => {
+  try {
+    const amountNum = parseFloat(data.amount || '0');
+    await transactionsApi.create({
+      type: 'EXPENSE',
+      amount: amountNum,
+      description: data.merchant,
+      date: new Date().toISOString(),
+      note: data.note,
+    });
+    await fetchTransactions(); // osveži seznam iz baze
     setFormVisible(false);
-  };
+  } catch (err) {
+    Alert.alert('Napaka', 'Transakcije ni bilo mogoče shraniti.');
+  }
+};
 
   return (
     <SafeAreaView

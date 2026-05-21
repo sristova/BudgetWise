@@ -12,11 +12,11 @@ import { apiRouter } from './routes';
 
 export const app = express();
 
-// ─── SECURITY ────────────────────────────────────────────────
+// ─── SECURITY 
 app.use(helmet());
 app.set('trust proxy', 1); // for Railway/Render behind reverse proxy
 
-// ─── CORS ────────────────────────────────────────────────────
+// ─── CORS 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim());
 app.use(cors({
   origin: (origin, cb) => {
@@ -29,27 +29,27 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
 }));
 
-// ─── BODY PARSING ────────────────────────────────────────────
+// ─── BODY PARSING 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(compression());
 
-// ─── LOGGING ─────────────────────────────────────────────────
+// ─── LOGGING 
 if (process.env.NODE_ENV !== 'test') {
   app.use(pinoHttp({ logger }));
 }
 
-// ─── RATE LIMITING ───────────────────────────────────────────
+// ─── RATE LIMITING 
 app.use(globalRateLimit);
 
-// ─── HEALTH CHECK ────────────────────────────────────────────
+// ─── HEALTH CHECK 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0' });
 });
 
-// ─── API ROUTES ──────────────────────────────────────────────
+// ─── API ROUTES 
 app.use('/api/v1', apiRouter);
 
-// ─── ERROR HANDLING ──────────────────────────────────────────
+// ─── ERROR HANDLING 
 app.use(notFound);
 app.use(errorHandler);

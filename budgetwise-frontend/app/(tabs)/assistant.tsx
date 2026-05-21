@@ -1,7 +1,10 @@
-import { View, Text, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { aiChatApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+
 
 const C = {
   bg1:'#070508', bg2:'#0D090C', card:'#120810',
@@ -10,153 +13,111 @@ const C = {
   text1:'#F5EEE8', text2:'#C8B8B0', text3:'#5C4A50',
 };
 
-// ─── Backend URL — nastavi v svojem .env ──────────────────────────────────────
-// Expo: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000
-const API_URL = "http://10.5.0.2:3000";
-
-const SUGGESTIONS = [
-  { id:1, icon:'help-circle-outline' as const, text:'Ali si lahko privoščim PS5 naslednji mesec?' },
-  { id:2, icon:'trending-up-outline' as const, text:'Kako privarčujem za počitnice?' },
-  { id:3, icon:'alert-circle-outline' as const, text:'Kje ljudje največ zapravijo?' },
-  { id:4, icon:'bulb-outline' as const, text:'Daj mi nasvet za varčevanje.' },
-];
-
-type Msg = { id:number; role:'user'|'ai'; text:string };
-
-// ─── Pomožna funkcija za JWT token ───────────────────────────────────────────
-// Prilagodi glede na to, kje shranjuješ token (AsyncStorage, SecureStore, context...)
-
-//HARDCODED ZA DEMO!!!!!!!
-async function getAuthToken(): Promise<string> {
-  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OGYyYWU1MC0xOTU2LTQxYTItODQ1Ni0wNDMxYWRiZDJkMGEiLCJlbWFpbCI6ImRlbW9AYnVkZ2V0d2lzZS5hcHAiLCJpYXQiOjE3NzkxOTIzMTIsImV4cCI6MTc3OTE5MzIxMn0.nbnWiH-QcnwYQsebYXDXOMuEHYLNOSr5IBYT6C_vCJA";
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 export default function AssistantScreen() {
-  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const insets = useSafeAreaInsets();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const ref = useRef<ScrollView>(null);
-  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const { isReady, isAuthenticated } = useAuth();
 
-  async function send(text?: string) {
-    const msg = text ?? input.trim();
-    if (!msg || loading) return;
 
-    const userMsg: Msg = { id: Date.now(), role: 'user', text: msg };
-    setMsgs(prev => [...prev, userMsg]);
-    setInput('');
+  // Load chat history securely on mount
+  useEffect(() => {
+  if (!isReady || !isAuthenticated) return;
+  async function loadHistory() {
+    try {
+      const history = await aiChatApi.getHistory();
+      setMessages(history ?? []);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch (err) {
+      console.error("Failed to load chat history", err);
+    }
+  }
+  loadHistory();
+}, [isReady, isAuthenticated]);
+
+  async function send(textToSend?: string) {
+    const targetText = textToSend ?? input;
+    if (!targetText.trim() || loading) return;
+
+    if (!textToSend) setInput('');
+    
+    const userMsg: Message = { id: String(Date.now()), role: 'user', content: targetText };
+    setMessages(prev => [...prev, userMsg]);
     setLoading(true);
-    setTimeout(() => ref.current?.scrollToEnd({ animated: true }), 100);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
 
     try {
-      const token = await getAuthToken();
-
-      const response = await fetch(`${API_URL}/api/v1/ai-chat/message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ message: msg }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.message ?? 'Napaka strežnika');
-      }
-
-      const aiText = data?.data?.message?.content ?? 'Prišlo je do napake. Poskusi znova.';
-      setMsgs(p => [...p, { id: Date.now(), role: 'ai', text: aiText }]);
-    } catch (err: any) {
-      setMsgs(p => [...p, {
-        id: Date.now(),
-        role: 'ai',
-        text: `❌ Napaka: ${err?.message ?? 'Preveri internet in prijavo.'}`,
+      // Securely calling the backend API instance with automatic dynamic token injection
+      const response = await aiChatApi.sendMessage(targetText);
+      const assistantMsg: Message = {
+        id: String(Date.now() + 1),
+        role: 'assistant',
+        content: response?.reply ?? response ?? "Oprostite, prišlo je do napake.",
+      };
+      setMessages(prev => [...prev, assistantMsg]);
+    } catch (err) {
+      setMessages(prev => [...prev, {
+        id: String(Date.now() + 1),
+        role: 'assistant',
+        content: "Napaka pri komunikaciji s strežnikom. Preverite povezavo.",
       }]);
     } finally {
       setLoading(false);
-      setTimeout(() => ref.current?.scrollToEnd({ animated: true }), 100);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
     }
   }
 
   return (
-    <SafeAreaView style={{ flex:1, backgroundColor:C.bg2 }} edges={['top']}>
-      <KeyboardAvoidingView
-        style={{ flex:1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-      >
-
+    <SafeAreaView edges={['top']} style={{ flex:1, backgroundColor:C.bg2 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex:1 }}>
+        
         {/* Header */}
-        <View style={{
-          flexDirection:'row', alignItems:'center', gap:10,
-          backgroundColor:C.accent, paddingHorizontal:20, paddingVertical:16,
-        }}>
-          <Ionicons name="chatbubble-ellipses" size={22} color={C.text1} />
-          <View style={{ flex:1 }}>
-            <Text style={{ fontSize:16, fontWeight:'500', color:C.text1 }}>AI finančni asistent</Text>
-            <Text style={{ fontSize:12, color:'rgba(245,238,232,0.75)', marginTop:2 }}>BudgetWise · Groq</Text>
-          </View>
+        <View style={{ padding:16, backgroundColor:C.bg1, borderBottomWidth:0.5, borderBottomColor:C.border1, flexDirection:'row', alignItems:'center', gap:10 }}>
+          <View style={{ width:8, height:8, borderRadius:4, backgroundColor:'#6FCFA0' }} />
+          <Text style={{ fontSize:16, fontWeight:'600', color:C.text1 }}>BudgetWise AI Asistent</Text>
         </View>
 
-        <ScrollView ref={ref} showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow:1 }}>
-
-          {/* Predlogi — vidni samo na začetku */}
-          {msgs.length === 0 && (
-            <View style={{ paddingHorizontal:16, gap:8, marginTop:16, marginBottom:8 }}>
-              <Text style={{ fontSize:11, color:C.text3, letterSpacing:0.08, textTransform:'uppercase', marginBottom:4 }}>
-                PREDLAGANA VPRAŠANJA
+        {/* Messages */}
+        <ScrollView ref={scrollRef} style={{ flex:1, padding:16 }} contentContainerStyle={{ paddingBottom:10 }}>
+          {messages.length === 0 && (
+            <View style={{ alignItems:'center', marginTop:40, paddingHorizontal:20 }}>
+              <Text style={{ fontSize:32, marginBottom:12 }}>🤖</Text>
+              <Text style={{ color:C.text1, fontSize:15, fontWeight:'600', marginBottom:4 }}>Pozdravljeni!</Text>
+              <Text style={{ color:C.text3, fontSize:13, textAlign:'center', marginBottom:20 }}>
+                Sem vaš osebni finančni svetovalec. Kako vam lahko pomagam danes?
               </Text>
-              {SUGGESTIONS.map(s => (
-                <TouchableOpacity
-                  key={s.id}
-                  onPress={() => send(s.text)}
-                  style={{
-                    backgroundColor:C.bg1, borderWidth:0.5, borderColor:C.border2,
-                    borderRadius:10, padding:12, flexDirection:'row', alignItems:'center', gap:10,
-                  }}
-                >
-                  <Ionicons name={s.icon} size={16} color={C.accent} />
-                  <Text style={{ fontSize:13, color:C.text2, flex:1 }}>{s.text}</Text>
-                  <Ionicons name="chevron-forward" size={14} color={C.border2} />
-                </TouchableOpacity>
-              ))}
             </View>
           )}
 
-          {/* Sporočila */}
-          <View style={{ paddingHorizontal:16, gap:10, paddingTop:4 }}>
-            {msgs.map(m => (
-              <View key={m.id} style={[
-                { maxWidth:'85%', borderRadius:14, padding:12 },
-                m.role === 'user'
-                  ? { alignSelf:'flex-end', backgroundColor:C.accent, borderBottomRightRadius:4 }
-                  : { alignSelf:'flex-start', backgroundColor:C.bg1, borderWidth:0.5, borderColor:C.border2, borderBottomLeftRadius:4 },
-              ]}>
-                <Text style={{ fontSize:13, lineHeight:20, color: m.role === 'user' ? C.text1 : C.text2 }}>
-                  {m.text}
-                </Text>
-              </View>
-            ))}
+          {messages.map(m => (
+            <View key={m.id} style={{
+              alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+              backgroundColor: m.role === 'user' ? C.accent : C.card,
+              borderWidth: m.role === 'user' ? 0 : 0.5,
+              borderColor: C.border1,
+              borderRadius:16, paddingHorizontal:14, paddingVertical:10,
+              maxWidth:'85%', marginBottom:12,
+            }}>
+              <Text style={{ fontSize:14, color:C.text1, lineHeight:20 }}>{m.content}</Text>
+            </View>
+          ))}
 
-            {/* Loading indikator */}
-            {loading && (
-              <View style={{
-                alignSelf:'flex-start', backgroundColor:C.bg1, borderWidth:0.5, borderColor:C.border2,
-                borderRadius:14, borderBottomLeftRadius:4, padding:14,
-                flexDirection:'row', gap:8, alignItems:'center',
-              }}>
-                <ActivityIndicator size="small" color={C.accent} />
-                <Text style={{ fontSize:12, color:C.text3 }}>Razmišljam...</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={{ height:16 }} />
+          {loading && (
+            <View style={{ alignSelf:'flex-start', backgroundColor:C.card, borderRadius:16, paddingHorizontal:14, paddingVertical:10, borderBottomWidth:0.5, borderColor:C.border1 }}>
+              <Text style={{ color:C.text3, fontSize:13 }}>Razmišljam...</Text>
+            </View>
+          )}
         </ScrollView>
 
-        {/* Input */}
+        {/* Input Footer Bar */}
         <View style={{
           flexDirection:'row', gap:8, padding:10,
           paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
@@ -175,7 +136,6 @@ export default function AssistantScreen() {
             onSubmitEditing={() => send()}
             returnKeyType="send"
             editable={!loading}
-            multiline={false}
           />
           <TouchableOpacity
             onPress={() => send()}

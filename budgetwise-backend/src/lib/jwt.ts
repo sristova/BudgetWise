@@ -31,8 +31,15 @@ export function verifyRefreshToken(token: string): JwtPayload & { jti: string } 
 }
 
 export function getRefreshTokenExpiry(): Date {
-  const days = parseInt((process.env.JWT_REFRESH_EXPIRES_IN ?? '30d').replace('d', ''), 10);
+  const raw = process.env.JWT_REFRESH_EXPIRES_IN ?? '30d';
   const date = new Date();
-  date.setDate(date.getDate() + days);
+  
+  if (raw.endsWith('d')) {
+    date.setDate(date.getDate() + parseInt(raw));
+  } else if (raw.endsWith('h')) {
+    date.setHours(date.getHours() + parseInt(raw));
+  } else {
+    date.setDate(date.getDate() + 30); // fallback
+  }
   return date;
 }
