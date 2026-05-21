@@ -58,6 +58,8 @@ export default function RegisterScreen() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) errs.email = 'Vnesite veljavno e-pošto';
     if (!fields.password) errs.password = 'Geslo je obvezno';
     else if (fields.password.length < 8) errs.password = 'Vsaj 8 znakov';
+    else if (!/[A-Z]/.test(fields.password)) errs.password = 'Geslo mora vsebovati vsaj eno veliko črko'; 
+    else if (!/[0-9]/.test(fields.password)) errs.password = 'Geslo mora vsebovati vsaj eno številko';
     if (fields.confirm !== fields.password) errs.confirm = 'Gesli se ne ujemata';
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
@@ -148,8 +150,7 @@ export default function RegisterScreen() {
             </View>
             {field('email', 'E-pošta', 'mail-outline', { placeholder: 'ime@primer.com', keyboard: 'email-address' })}
             {field('password', 'Geslo', 'key-outline', { placeholder: '••••••••', secure: true, toggle: true })}
-            {field('confirm', 'Potrdi geslo', 'shield-checkmark-outline', { placeholder: '••••••••', secure: true })}
-
+            {field('confirm', 'Potrdi geslo', 'shield-checkmark-outline', { placeholder: '••••••••', secure: true, toggle: true })}
             <TouchableOpacity
               style={[styles.btnPrimary, isLoading && styles.btnDisabled]}
               onPress={handleRegister}
