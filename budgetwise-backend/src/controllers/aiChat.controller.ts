@@ -72,7 +72,7 @@ export async function sendMessage(req: Request, res: Response) {
     data: { userId, role: 'assistant', content: aiText, tokens },
   });
 
-  return success(res, { message: aiMessage });
+  return success(res, { reply: aiText });
 }
 
 export async function clearHistory(req: Request, res: Response) {

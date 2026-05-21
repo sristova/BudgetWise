@@ -512,7 +512,7 @@ useEffect(() => {
       type: 'EXPENSE',
       amount: amountNum,
       description: data.merchant,
-      date: new Date().toISOString(),
+      date: new Date().toISOString().split('T')[0], 
       note: data.note,
     });
     await fetchTransactions(); // osveži seznam iz baze

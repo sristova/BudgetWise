@@ -34,7 +34,11 @@ export default function AssistantScreen() {
   async function loadHistory() {
     try {
       const history = await aiChatApi.getHistory();
-      setMessages(history ?? []);
+      setMessages((history ?? []).map((m: any) => ({
+      id: String(m.id),
+      role: m.role,
+      content: m.content,
+    })));
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (err) {
       console.error("Failed to load chat history", err);
@@ -60,7 +64,7 @@ export default function AssistantScreen() {
       const assistantMsg: Message = {
         id: String(Date.now() + 1),
         role: 'assistant',
-        content: response?.reply ?? response ?? "Oprostite, prišlo je do napake.",
+    content: response?.reply ?? "Oprostite, prišlo je do napake.",
       };
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
