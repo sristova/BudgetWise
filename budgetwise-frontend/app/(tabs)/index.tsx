@@ -24,7 +24,7 @@ const C = {
   text1: '#F5EEE8', text2: '#C8B8B0', text3: '#5C4A50',
 };
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAYS = ['Pon', 'Tor', 'Sre', 'Čet', 'Pet', 'Sob', 'Ned'];
 
 interface DashboardData {
   balance: number;
@@ -88,7 +88,7 @@ export default function HomeScreen() {
         {/* ── Header ── */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.bg1, paddingHorizontal: 20, paddingVertical: 14 }}>
           <View>
-            <Text style={{ fontSize: 12, color: C.text3 }}>Good day,</Text>
+            <Text style={{ fontSize: 12, color: C.text3 }}>Dober dan,</Text>
             <Text style={{ fontSize: 17, fontWeight: '500', color: C.text1 }}>
               {user?.firstName ?? 'there'} 👋
             </Text>
@@ -107,13 +107,13 @@ export default function HomeScreen() {
         {loading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 }}>
             <ActivityIndicator color={C.accent} size="large" />
-            <Text style={{ color: C.text3, marginTop: 12, fontSize: 13 }}>Loading your finances…</Text>
+            <Text style={{ color: C.text3, marginTop: 12, fontSize: 13 }}>Nalagam finance…</Text>
           </View>
         ) : (
           <>
             {/* ── Balance card ── */}
             <View style={{ backgroundColor: C.accent, margin: 16, borderRadius: 16, padding: 20 }}>
-              <Text style={{ fontSize: 11, color: 'rgba(245,238,232,0.7)', letterSpacing: 0.08 }}>TOTAL BALANCE</Text>
+              <Text style={{ fontSize: 11, color: 'rgba(245,238,232,0.7)', letterSpacing: 0.08 }}>SKUPNO STANJE</Text>
               <Text style={{ fontSize: 32, fontWeight: '500', color: C.text1, marginTop: 4, marginBottom: 16 }}>
                 {formatCurrency(data?.balance ?? 0, user?.currency)}
               </Text>
@@ -121,7 +121,7 @@ export default function HomeScreen() {
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Ionicons name="arrow-down" size={12} color={C.warm} />
-                    <Text style={{ fontSize: 10, color: 'rgba(245,238,232,0.75)' }}>Income</Text>
+                    <Text style={{ fontSize: 10, color: 'rgba(245,238,232,0.75)' }}>Prihodki</Text>
                   </View>
                   <Text style={{ fontSize: 15, fontWeight: '500', color: C.text1, marginTop: 3 }}>
                     {formatCurrency(data?.totalIncome ?? 0, user?.currency)}
@@ -130,7 +130,7 @@ export default function HomeScreen() {
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Ionicons name="arrow-up" size={12} color={C.accent} />
-                    <Text style={{ fontSize: 10, color: 'rgba(245,238,232,0.75)' }}>Expenses</Text>
+                    <Text style={{ fontSize: 10, color: 'rgba(245,238,232,0.75)' }}>Stroški</Text>
                   </View>
                   <Text style={{ fontSize: 15, fontWeight: '500', color: C.text1, marginTop: 3 }}>
                     {formatCurrency(data?.totalExpenses ?? 0, user?.currency)}
@@ -141,13 +141,14 @@ export default function HomeScreen() {
 
             {/* ── Quick actions ── */}
             <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-              <Text style={{ fontSize: 11, color: C.text3, letterSpacing: 0.08, marginBottom: 10, textTransform: 'uppercase' }}>QUICK ACCESS</Text>
+              <Text style={{ fontSize: 11, color: C.text3, letterSpacing: 0.08, marginBottom: 10, textTransform: 'uppercase' }}>HITER DOSTOP</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
                 {[
-                  { label: 'Add expense', icon: 'add-circle-outline' as const, screen: '/transactions' },
-                  { label: 'Scan receipt', icon: 'camera-outline' as const, screen: '/transactions' },
-                  { label: 'Goals', icon: 'flag-outline' as const, screen: '/goals' },
-                  { label: 'AI assistant', icon: 'chatbubble-ellipses-outline' as const, screen: '/assistant' },
+                { label: 'Dodaj strošek', icon: 'add-circle-outline' as const, screen: '/transactions' },
+                { label: 'Skeniraj račun', icon: 'camera-outline' as const, screen: '/transactions' },
+                { label: 'Cilji', icon: 'flag-outline' as const, screen: '/goals' },
+                { label: 'AI asistent', icon: 'chatbubble-ellipses-outline' as const, screen: '/assistant' },
+
                 ].map((a) => (
                   <TouchableOpacity
                     key={a.label}
@@ -163,10 +164,10 @@ export default function HomeScreen() {
 
             {/* ── Weekly chart ── */}
             <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-              <Text style={{ fontSize: 11, color: C.text3, letterSpacing: 0.08, marginBottom: 10, textTransform: 'uppercase' }}>THIS WEEK</Text>
+              <Text style={{ fontSize: 11, color: C.text3, letterSpacing: 0.08, marginBottom: 10, textTransform: 'uppercase' }}>TA TEDEN</Text>
               <View style={{ backgroundColor: C.bg1, borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 0.5, borderColor: C.border2 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <Text style={{ fontSize: 12, color: C.text3 }}>Spending</Text>
+                  <Text style={{ fontSize: 12, color: C.text3 }}>Poraba</Text>
                   <Text style={{ fontSize: 12, fontWeight: '500', color: C.text1 }}>
                     {formatCurrency(bars.reduce((a, b) => a + b, 0), user?.currency)}
                   </Text>
@@ -184,11 +185,11 @@ export default function HomeScreen() {
 
             {/* ── Recent transactions ── */}
             <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-              <Text style={{ fontSize: 11, color: C.text3, letterSpacing: 0.08, marginBottom: 10, textTransform: 'uppercase' }}>RECENT TRANSACTIONS</Text>
+              <Text style={{ fontSize: 11, color: C.text3, letterSpacing: 0.08, marginBottom: 10, textTransform: 'uppercase' }}>NEDAVNE TRANSAKCIJE</Text>
               <View style={{ gap: 8 }}>
                 {(data?.recentTransactions ?? []).length === 0 ? (
                   <View style={{ backgroundColor: C.bg1, borderRadius: 12, padding: 20, alignItems: 'center', borderWidth: 0.5, borderColor: C.border1 }}>
-                    <Text style={{ color: C.text3, fontSize: 13 }}>No transactions yet.</Text>
+                    <Text style={{ color: C.text3, fontSize: 13 }}>Še ni transakcij.</Text>
                   </View>
                 ) : (
                   data?.recentTransactions.map((tx) => (
