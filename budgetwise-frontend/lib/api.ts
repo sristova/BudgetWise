@@ -201,21 +201,41 @@ export const transactionsApi = {
 // ── Goals 
 export const goalsApi = {
   async getAll(status?: string) {
-    const res = await api.get('/goals', { params: { status } });
+    const res = await api.get('/goals', {
+      params: status ? { status } : undefined,
+    });
+
     return res.data.data;
   },
+
   async create(data: {
     name: string;
     targetAmount: number;
     targetDate?: string;
     description?: string;
+    icon?: string;
+    currency?: string;
+    deadline?: string;
   }) {
     const res = await api.post('/goals', data);
     return res.data.data;
   },
-  async contribute(id: string, amount: number) {
-    const res = await api.post(`/goals/${id}/contribute`, { amount });
+
+async update(id: string, data: any) {
+    const res = await api.patch(`/goals/${id}`, data);
     return res.data.data;
+  },
+
+  async contribute(id: string, amount: number) {
+    const res = await api.post(`/goals/${id}/contribute`, {
+      amount,
+    });
+
+    return res.data.data;
+  },
+
+  async delete(id: string) {
+    await api.delete(`/goals/${id}`);
   },
 };
 
