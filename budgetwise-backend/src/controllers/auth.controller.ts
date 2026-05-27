@@ -12,6 +12,8 @@ import { registerSchema, loginSchema, refreshSchema } from '../validators/auth.v
 import { ConflictError, UnauthorizedError } from '../lib/errors';
 import { success, created } from '../lib/response';
 import { logger } from '../lib/logger';
+import { verifyGoogleToken, verifyFacebookToken } from '../lib/socialAuth';
+import { issueTokens, rotateRefreshToken as libRotateRefreshToken } from '../lib/tokenService';
 
 export async function register(req: Request, res: Response) {
   const { email, password, firstName, lastName, currency } = registerSchema.parse({ body: req.body }).body;
@@ -30,22 +32,12 @@ export async function register(req: Request, res: Response) {
   // Seed default categories
   await seedDefaultCategories(user.id);
 
-  const accessToken = signAccessToken({ sub: user.id, email: user.email });
-  const refreshToken = signRefreshToken({ sub: user.id, email: user.email });
-
-  await prisma.refreshToken.create({
-    data: {
-      token: refreshToken,
-      userId: user.id,
-      expiresAt: getRefreshTokenExpiry(),
-      ipAddress: req.ip,
-      deviceInfo: req.headers['user-agent'],
-    },
-  });
+  const tokens = await issueTokens(user.id, user.email);
 
   logger.info({ userId: user.id }, 'User registered');
 
-  return created(res, { user, accessToken, refreshToken });
+  // Žetone vrneš nazaj aplikaciji z destrukturiranjem (...tokens)
+  return created(res, { user, ...tokens });
 }
 
 export async function login(req: Request, res: Response) {
@@ -58,21 +50,11 @@ export async function login(req: Request, res: Response) {
 
   if (!user || !user.isActive) throw new UnauthorizedError('Invalid email or password');
 
+  if (!user.passwordHash) throw new UnauthorizedError('Invalid email or password');
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) throw new UnauthorizedError('Invalid email or password');
 
-  const accessToken = signAccessToken({ sub: user.id, email: user.email });
-  const refreshToken = signRefreshToken({ sub: user.id, email: user.email });
-
-  await prisma.refreshToken.create({
-    data: {
-      token: refreshToken,
-      userId: user.id,
-      expiresAt: getRefreshTokenExpiry(),
-      ipAddress: req.ip,
-      deviceInfo: req.headers['user-agent'],
-    },
-  });
+  const tokens = await issueTokens(user.id, user.email);
 
   await prisma.user.update({
     where: { id: user.id },
@@ -80,55 +62,20 @@ export async function login(req: Request, res: Response) {
   });
 
   const { passwordHash: _, ...safeUser } = user;
-
   logger.info({ userId: user.id }, 'User logged in');
 
-  return success(res, { user: safeUser, accessToken, refreshToken });
+  return success(res, { user: safeUser, ...tokens });
 }
 
 export async function refreshToken(req: Request, res: Response) {
   const { refreshToken: token } = refreshSchema.parse({ body: req.body }).body;
 
-  let payload: ReturnType<typeof verifyRefreshToken>;
-  try {
-    payload = verifyRefreshToken(token);
-  } catch {
-    throw new UnauthorizedError('Invalid refresh token');
+try {
+    const tokens = await libRotateRefreshToken(token); 
+    return success(res, tokens);
+  } catch (error: any) {
+    throw new UnauthorizedError(error.message || 'Refresh token invalid or expired');
   }
-
-  const stored = await prisma.refreshToken.findUnique({ where: { token } });
-
-  if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-    // Possible token reuse — revoke all tokens for this user (security)
-    if (stored) {
-      await prisma.refreshToken.updateMany({
-        where: { userId: stored.userId },
-        data: { revokedAt: new Date() },
-      });
-    }
-    throw new UnauthorizedError('Refresh token invalid or expired');
-  }
-
-  // Rotate: revoke old, issue new
-  await prisma.refreshToken.update({
-    where: { id: stored.id },
-    data: { revokedAt: new Date() },
-  });
-
-  const newAccessToken = signAccessToken({ sub: payload.sub, email: payload.email });
-  const newRefreshToken = signRefreshToken({ sub: payload.sub, email: payload.email });
-
-  await prisma.refreshToken.create({
-    data: {
-      token: newRefreshToken,
-      userId: payload.sub,
-      expiresAt: getRefreshTokenExpiry(),
-      ipAddress: req.ip,
-      deviceInfo: req.headers['user-agent'],
-    },
-  });
-
-  return success(res, { accessToken: newAccessToken, refreshToken: newRefreshToken });
 }
 
 export async function logout(req: Request, res: Response) {
@@ -158,23 +105,123 @@ export async function me(req: Request, res: Response) {
   return success(res, user);
 }
 
-// ─── Helpers ─────────────────────────────────────────────────
+// ─── Helpers 
 
 async function seedDefaultCategories(userId: string) {
   const defaults = [
-    { name: 'Food & Dining', icon: '🍔', color: '#FF6B6B', type: 'EXPENSE' as const },
-    { name: 'Transport', icon: '🚗', color: '#4ECDC4', type: 'EXPENSE' as const },
-    { name: 'Shopping', icon: '🛍️', color: '#45B7D1', type: 'EXPENSE' as const },
-    { name: 'Housing', icon: '🏠', color: '#96CEB4', type: 'EXPENSE' as const },
-    { name: 'Entertainment', icon: '🎮', color: '#FFEAA7', type: 'EXPENSE' as const },
-    { name: 'Health', icon: '💊', color: '#DDA0DD', type: 'EXPENSE' as const },
-    { name: 'Education', icon: '📚', color: '#98D8C8', type: 'EXPENSE' as const },
-    { name: 'Salary', icon: '💼', color: '#77DD77', type: 'INCOME' as const },
-    { name: 'Freelance', icon: '💻', color: '#89CFF0', type: 'INCOME' as const },
-    { name: 'Investment', icon: '📈', color: '#FFD700', type: 'INCOME' as const },
+    // Stroški (EXPENSE)
+    { name: 'Hrana in pijača', icon: '🍔', color: '#FF6B6B', type: 'EXPENSE' as const },
+    { name: 'Transport in avto', icon: '🚗', color: '#4ECDC4', type: 'EXPENSE' as const },
+    { name: 'Nakupovanje', icon: '🛍️', color: '#45B7D1', type: 'EXPENSE' as const },
+    { name: 'Stanovanje in stroški', icon: '🏠', color: '#96CEB4', type: 'EXPENSE' as const },
+    { name: 'Zabava in prosti čas', icon: '🎮', color: '#FFEAA7', type: 'EXPENSE' as const },
+    { name: 'Zdravje in oskrba', icon: '💊', color: '#DDA0DD', type: 'EXPENSE' as const },
+    { name: 'Izobraževanje', icon: '📚', color: '#98D8C8', type: 'EXPENSE' as const },
+    
+    // Prihodki (INCOME)
+    { name: 'Plača', icon: '💼', color: '#77DD77', type: 'INCOME' as const },
+    { name: 'Dodatni zaslužek', icon: '💻', color: '#89CFF0', type: 'INCOME' as const },
+    { name: 'Investicije', icon: '📈', color: '#FFD700', type: 'INCOME' as const },
   ];
 
   await prisma.category.createMany({
     data: defaults.map(d => ({ ...d, userId, isDefault: true })),
   });
 }
+
+// ─── Social Auth 
+
+async function handleSocialLogin(
+  req: Request,
+  res: Response,
+  provider: 'google' | 'facebook',
+  providerData: {
+    providerId: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+  }
+) {
+  const { providerId, email, firstName, lastName, avatarUrl } = providerData;
+
+  // 1. Poišči obstoječ socialni račun
+  const socialAccount = await prisma.socialAccount.findUnique({
+    where: { provider_providerId: { provider, providerId } },
+    include: { user: true },
+  });
+
+  if (socialAccount) {
+    const tokens = await issueTokens(socialAccount.userId, socialAccount.user.email);
+    
+    await prisma.user.update({ 
+      where: { id: socialAccount.userId }, 
+      data: { lastLoginAt: new Date() } 
+    });
+    
+    return success(res, { user: socialAccount.user, ...tokens });
+  }
+
+  // 2. Poveži z obstoječim računom po emailu (VARNOSTNA PREVERBA)
+  let user = null;
+  if (email) {
+    if (provider === 'google') {
+      // Googlu popolnoma zaupamo, ker vaša koda preveri 'verifyIdToken' s strani Googla
+      user = await prisma.user.findUnique({ where: { email } });
+    } else {
+      // Za Facebook: Če email že obstaja v bazi, NE dovoli avtomatske prijave.
+      // S tem preprečimo, da bi napadalec z lažnim Facebook profilom vdrl v tuj račun.
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Račun s to e-pošto že obstaja. Prijavite se z geslom ali Googlom.'
+        });
+      }
+    }
+  }
+
+  // 3. Ustvari novega uporabnika, če sploh ne obstaja v bazi
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        email: email ?? `${provider}_${providerId}@noemail.budgetwise`,
+        firstName: firstName ?? undefined,
+        lastName:  lastName ?? undefined,
+        avatarUrl: avatarUrl ?? undefined,
+        isEmailVerified: provider === 'google', // Google emaili so potrjeni pod pokrovom, FB pa ne nujno
+      },
+    });
+    await seedDefaultCategories(user.id);
+  }
+
+  // 4. Ustvari social account zapis
+  await prisma.socialAccount.create({
+    data: { userId: user.id, provider, providerId, email },
+  });
+
+ 
+  const tokens = await issueTokens(user.id, user.email);
+
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
+  logger.info({ userId: user.id, provider }, 'User logged in via social');
+
+  const { passwordHash: _, ...safeUser } = user as any;
+  return created(res, { user: safeUser, ...tokens });
+}
+
+export async function googleLogin(req: Request, res: Response) {
+  const { idToken } = req.body;
+  if (!idToken) throw new Error('idToken je zahtevan');
+  const data = await verifyGoogleToken(idToken);
+  return handleSocialLogin(req, res, 'google', data);
+}
+
+export async function facebookLogin(req: Request, res: Response) {
+  const { accessToken } = req.body;
+  if (!accessToken) throw new Error('accessToken je zahtevan');
+  const data = await verifyFacebookToken(accessToken);
+  return handleSocialLogin(req, res, 'facebook', data);
+}
+

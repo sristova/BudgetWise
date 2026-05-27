@@ -9,7 +9,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── ENUMS ───────────────────────────────────────────────────────────────────
+// ─── ENUMS 
 
 enum TransactionType {
   INCOME
@@ -49,14 +49,14 @@ enum Currency {
   BAM
 }
 
-// ─── USERS ───────────────────────────────────────────────────────────────────
+// ─── USERS 
 
 model User {
   id               String    @id @default(uuid())
   email            String    @unique
-  passwordHash     String    @map("password_hash")
-  firstName        String    @map("first_name")
-  lastName         String    @map("last_name")
+  passwordHash     String?    @map("password_hash")
+  firstName        String?    @map("first_name")
+  lastName         String?    @map("last_name")
   avatarUrl        String?   @map("avatar_url")
   currency         Currency  @default(EUR)
   timezone         String    @default("Europe/Ljubljana")
@@ -69,6 +69,7 @@ model User {
 
   // Relations
   refreshTokens    RefreshToken[]
+  socialAccounts   SocialAccount[]
   categories       Category[]
   transactions     Transaction[]
   budgets          Budget[]
@@ -81,7 +82,7 @@ model User {
   @@index([email])
 }
 
-// ─── AUTH ─────────────────────────────────────────────────────────────────────
+// ─── AUTH 
 
 model RefreshToken {
   id          String    @id @default(uuid())
@@ -99,7 +100,7 @@ model RefreshToken {
   @@index([token])
 }
 
-// ─── CATEGORIES ───────────────────────────────────────────────────────────────
+// ─── CATEGORIES 
 
 model Category {
   id        String          @id @default(uuid())
@@ -122,7 +123,7 @@ model Category {
   @@index([userId, type])
 }
 
-// ─── TRANSACTIONS (expenses + income unified) ─────────────────────────────────
+// ─── TRANSACTIONS (expenses + income unified) 
 
 model Transaction {
   id          String          @id @default(uuid())
@@ -151,7 +152,7 @@ model Transaction {
   @@index([date])
 }
 
-// ─── BUDGETS ─────────────────────────────────────────────────────────────────
+// ─── BUDGETS 
 
 model Budget {
   id          String       @id @default(uuid())
@@ -175,7 +176,7 @@ model Budget {
   @@index([userId, isActive])
 }
 
-// ─── SAVINGS GOALS ───────────────────────────────────────────────────────────
+// ─── SAVINGS GOALS 
 
 model Goal {
   id            String     @id @default(uuid())
@@ -197,7 +198,7 @@ model Goal {
   @@index([userId, status])
 }
 
-// ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
+// ─── NOTIFICATIONS 
 
 model Notification {
   id        String           @id @default(uuid())
@@ -216,7 +217,7 @@ model Notification {
   @@index([userId, isRead])
 }
 
-// ─── AI CHAT HISTORY ─────────────────────────────────────────────────────────
+// ─── AI CHAT HISTORY 
 
 model AiChat {
   id        String   @id @default(uuid())
@@ -232,7 +233,7 @@ model AiChat {
   @@index([userId, createdAt])
 }
 
-// ─── REPORTS (cached analytics) ──────────────────────────────────────────────
+// ─── REPORTS (cached analytics) 
 
 model Report {
   id        String   @id @default(uuid())
@@ -246,4 +247,21 @@ model Report {
   @@map("reports")
   @@unique([userId, type, period])
   @@index([userId])
+}
+
+// ─── SOCIAL AUTH 
+
+model SocialAccount {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  provider    String   // "google" | "apple" | "facebook"
+  providerId  String   @map("provider_id")
+  email       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@map("social_accounts")
 }

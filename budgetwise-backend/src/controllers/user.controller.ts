@@ -3,6 +3,8 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { success, noContent } from '../lib/response';
+import bcrypt from 'bcryptjs';
+import { UnauthorizedError } from '../lib/errors';
 
 const updateProfileSchema = z.object({
   firstName: z.string().min(1).max(50).optional(),
@@ -36,6 +38,38 @@ export async function updateProfile(req: Request, res: Response) {
     },
   });
   return success(res, user);
+}
+
+export async function changePassword(req: Request, res: Response) {
+  const { currentPassword, newPassword } = req.body;
+  
+  const user = await prisma.user.findUniqueOrThrow({ 
+    where: { id: req.user!.id } 
+  });
+
+  if (user.passwordHash) {
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) throw new UnauthorizedError('Napačno trenutno geslo');
+  }
+
+  if (!newPassword || newPassword.length < 8) {
+    throw new Error('Geslo mora imeti vsaj 8 znakov');
+  }
+
+  const hash = await bcrypt.hash(newPassword, parseInt(process.env.BCRYPT_ROUNDS ?? '12'));
+  
+  await prisma.user.update({ 
+    where: { id: req.user!.id }, 
+    data: { passwordHash: hash } 
+  });
+
+  // Revoke vse refresh tokene — varnostni ukrep
+  await prisma.refreshToken.updateMany({
+    where: { userId: req.user!.id, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+
+  return success(res, { message: 'Geslo uspešno posodobljeno' });
 }
 
 export async function deleteAccount(req: Request, res: Response) {

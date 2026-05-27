@@ -150,6 +150,20 @@ export const authApi = {
     }
   },
 
+async googleLogin(idToken: string) {
+  const res = await api.post('/auth/google', { idToken });
+  const { user, accessToken, refreshToken } = res.data.data;
+  await tokenStorage.save(accessToken, refreshToken);
+  return user;
+},
+
+async facebookLogin(accessToken: string) {
+  const res = await api.post('/auth/facebook', { accessToken });
+  const { user, accessToken: at, refreshToken } = res.data.data;
+  await tokenStorage.save(at, refreshToken);
+  return user;
+},
+
   async me() {
     const res = await api.get('/auth/me');
     return res.data.data;

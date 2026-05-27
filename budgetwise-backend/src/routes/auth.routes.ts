@@ -1,6 +1,6 @@
 // src/routes/auth.routes.ts
 import { Router } from 'express';
-import { register, login, refreshToken, logout, me } from '../controllers/auth.controller';
+import { register, login, refreshToken, logout, me, googleLogin, facebookLogin  } from '../controllers/auth.controller';
 import { authRateLimit } from '../middleware/rateLimit';
 import { authenticate } from '../middleware/authenticate';
 
@@ -11,5 +11,7 @@ router.post('/login', authRateLimit, login);
 router.post('/refresh', refreshToken);
 router.post('/logout', logout);
 router.get('/me', authenticate, me);
+router.post('/google',   authRateLimit, googleLogin);
+router.post('/facebook', authRateLimit, facebookLogin);
 
 export default router;

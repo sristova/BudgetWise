@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-
+import SocialAuthButtons from '@/components/SocialAuthButtons';
 import { useAuth } from '@/contexts/AuthContext';
 
 const C = {
@@ -168,6 +168,8 @@ export default function RegisterScreen() {
                 )}
               </LinearGradient>
             </TouchableOpacity>
+
+             <SocialAuthButtons />
 
             <Text style={styles.terms}>
               Z ustvarjanjem računa se strinjaš z našimi{' '}

@@ -42,6 +42,8 @@ export interface AuthActions {
   logout: () => Promise<void>;
   clearError: () => void;
   refreshUser: () => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithFacebook: (accessToken: string) => Promise<void>;
 }
 
 export interface RegisterData {
@@ -137,6 +139,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+  setIsLoading(true);
+  setError(null);
+  try {
+    const u = await authApi.googleLogin(idToken);
+    setUser(u);
+  } catch (err: any) {
+    const message = err?.response?.data?.message ?? err?.message ?? 'Google login failed.';
+    setError(message);
+    throw err;
+  } finally {
+    setIsLoading(false);
+  }
+  }, []);
+
+  const loginWithFacebook = useCallback(async (accessToken: string) => {
+  setIsLoading(true);
+  setError(null);
+  try {
+    const u = await authApi.facebookLogin(accessToken);
+    setUser(u);
+  } catch (err: any) {
+    const message = err?.response?.data?.message ?? err?.message ?? 'Facebook login failed.';
+    setError(message);
+    throw err;
+  } finally {
+    setIsLoading(false);
+  }
+  }, []);
+
   // ── Logout 
   const logout = useCallback(async () => {
     setIsLoading(true);
@@ -174,6 +206,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     clearError,
     refreshUser,
+    loginWithGoogle,
+    loginWithFacebook,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-
+import SocialAuthButtons from '@/components/SocialAuthButtons';
 import { useAuth } from '@/contexts/AuthContext';
 
 const C = {
@@ -179,6 +179,7 @@ export default function LoginScreen() {
                 )}
               </LinearGradient>
             </TouchableOpacity>
+          <SocialAuthButtons />
           </View>
 
           {/* Povezava na registracijo */}
@@ -186,7 +187,7 @@ export default function LoginScreen() {
             <Text style={styles.switchText}>Nimaš računa? </Text>
             <TouchableOpacity onPress={() => router.replace('/register' as any)}>
               <Text style={styles.switchLink}>Registracija</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> 
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
