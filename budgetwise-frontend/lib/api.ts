@@ -271,6 +271,26 @@ export const reportsApi = {
     const res = await api.get('/reports/monthly', { params: { year, month } });
     return res.data.data;
   },
+ 
+  async getYearly(year: number) {
+    const res = await api.get('/reports/yearly', { params: { year } });
+    return res.data.data;
+  },
+ 
+  async getCategories(year: number, month: number, type: 'INCOME' | 'EXPENSE' = 'EXPENSE') {
+    const res = await api.get('/reports/categories', { params: { year, month, type } });
+    return res.data.data;
+  },
+ 
+  async getTrends(months: number = 6) {
+    const res = await api.get('/reports/trends', { params: { months } });
+    return res.data.data;
+  },
+ 
+  async getStatistics(year: number, month: number) {
+    const res = await api.get('/reports/statistics', { params: { year, month } });
+    return res.data.data;
+  },
 };
 
 // ── Categories 

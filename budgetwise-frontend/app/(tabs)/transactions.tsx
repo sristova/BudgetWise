@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { transactionsApi, categoriesApi } from '@/lib/api';
@@ -149,61 +150,47 @@ function FilterBar({
 
 // ─── Transaction Card 
 function TxCard({ tx }: { tx: any }) {
+  const isExpense = tx.type === 'EXPENSE';
+  
   return (
-    <View
-      style={{
-        backgroundColor: C.bg1,
-        borderRadius: 12,
-        padding: 12,
-        flexDirection: "row",
+    <View style={{
+      backgroundColor: C.bg1,
+      borderRadius: 12,
+      padding: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      borderWidth: 0.5,
+      borderColor: C.border1,
+    }}>
+      <View style={{
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        backgroundColor: C.border2,
         alignItems: "center",
-        gap: 12,
-        borderWidth: 0.5,
-        borderColor: C.border1,
-      }}
-    >
-      <View
-        style={{
-          width: 38,
-          height: 38,
-          borderRadius: 10,
-          backgroundColor: tx.ibg,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Ionicons name={tx.icon} size={18} color={tx.ic} />
+        justifyContent: "center",
+      }}>
+        <Text style={{ fontSize: 18 }}>
+          {tx.category?.icon ?? (isExpense ? '💸' : '💚')}
+        </Text>
       </View>
 
       <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            fontSize: 14,
-            color: C.text1,
-            fontWeight: "500",
-          }}
-        >
-          {tx.name}
+        <Text style={{ fontSize: 14, color: C.text1, fontWeight: "500" }}>
+          {tx.description}
         </Text>
-
-        <Text
-          style={{
-            fontSize: 12,
-            color: C.text3,
-          }}
-        >
-          {tx.cat}
+        <Text style={{ fontSize: 12, color: C.text3 }}>
+          {tx.category?.name ?? 'Nekategorizirano'} · {tx.date?.split('T')[0]}
         </Text>
       </View>
 
-      <Text
-        style={{
-          fontSize: 14,
-          fontWeight: "500",
-          color: C.accent,
-        }}
-      >
-        {tx.amount}
+      <Text style={{
+        fontSize: 14,
+        fontWeight: "500",
+        color: isExpense ? C.accent : C.warm,
+      }}>
+        {isExpense ? '-' : '+'}€{parseFloat(tx.amount).toFixed(2)}
       </Text>
     </View>
   );
