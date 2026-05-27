@@ -56,15 +56,15 @@ export async function changePassword(req: Request, res: Response) {
     throw new Error('Geslo mora imeti vsaj 8 znakov');
   }
 
-  const hash = await bcrypt.hash(newPassword, parseInt(process.env.BCRYPT_ROUNDS ?? '12'));
-  
+const hash = await bcrypt.hash(newPassword, 10);
+
   await prisma.user.update({ 
     where: { id: req.user!.id }, 
     data: { passwordHash: hash } 
   });
 
   // Revoke vse refresh tokene — varnostni ukrep
-  await prisma.refreshToken.updateMany({
+ await prisma.refreshToken.updateMany({
     where: { userId: req.user!.id, revokedAt: null },
     data: { revokedAt: new Date() },
   });

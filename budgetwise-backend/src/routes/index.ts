@@ -1,51 +1,28 @@
 import { Router } from 'express';
-import authRoutes from './auth.routes';
 import { authenticate } from '../middleware/authenticate';
+
+// Standardni uvozi vseh poti
+import authRoutes from './auth.routes';
+import userRoutes from './user.routes';
+import transactionRoutes from './transaction.routes';
+import categoryRoutes from './category.routes';
+import budgetRoutes from './budget.routes';
+import goalRoutes from './goal.routes';
+import reportRoutes from './report.routes';
+import notificationRoutes from './notification.routes';
+import aiChatRoutes from './aiChat.routes';
 
 export const apiRouter = Router();
 
-// 1. Javne poti (Ostanejo standardne)
+// 1. Javne poti
 apiRouter.use('/auth', authRoutes);
 
-
-// 2. Trajna rešitev za vse zaščitene poti (Naložijo se varno ob klicu):
-
-apiRouter.use('/users', authenticate, (req, res, next) => {
-  const routes = require('./user.routes').default;
-  return routes(req, res, next);
-});
-
-apiRouter.use('/transactions', authenticate, (req, res, next) => {
-  const routes = require('./transaction.routes').default;
-  return routes(req, res, next);
-});
-
-apiRouter.use('/categories', authenticate, (req, res, next) => {
-  const routes = require('./category.routes').default;
-  return routes(req, res, next);
-});
-
-apiRouter.use('/budgets', authenticate, (req, res, next) => {
-  const routes = require('./budget.routes').default;
-  return routes(req, res, next);
-});
-
-apiRouter.use('/goals', authenticate, (req, res, next) => {
-  const routes = require('./goal.routes').default;
-  return routes(req, res, next);
-});
-
-apiRouter.use('/reports', authenticate, (req, res, next) => {
-  const routes = require('./report.routes').default;
-  return routes(req, res, next);
-});
-
-apiRouter.use('/notifications', authenticate, (req, res, next) => {
-  const routes = require('./notification.routes').default;
-  return routes(req, res, next);
-});
-
-apiRouter.use('/ai-chat', authenticate, (req, res, next) => {
-  const routes = require('./aiChat.routes').default;
-  return routes(req, res, next);
-});
+// 2. Zaščitene poti (z dodanim authenticate middleware-om)
+apiRouter.use('/users', authenticate, userRoutes);
+apiRouter.use('/transactions', authenticate, transactionRoutes);
+apiRouter.use('/categories', authenticate, categoryRoutes);
+apiRouter.use('/budgets', authenticate, budgetRoutes);
+apiRouter.use('/goals', authenticate, goalRoutes);
+apiRouter.use('/reports', authenticate, reportRoutes);
+apiRouter.use('/notifications', authenticate, notificationRoutes);
+apiRouter.use('/ai-chat', authenticate, aiChatRoutes);
