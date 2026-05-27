@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { success, noContent } from '../lib/response';
 import bcrypt from 'bcryptjs';
 import { UnauthorizedError } from '../lib/errors';
+import { uploadToCloudinary } from '../config/cloudinary';
 
 const updateProfileSchema = z.object({
   firstName: z.string().min(1).max(50).optional(),
@@ -75,4 +76,31 @@ const hash = await bcrypt.hash(newPassword, 10);
 export async function deleteAccount(req: Request, res: Response) {
   await prisma.user.delete({ where: { id: req.user!.id } });
   return noContent(res);
+}
+
+export async function uploadAvatar(req: Request, res: Response) {
+  if (!req.file) {
+    throw new Error('Niste naložili nobene datoteke');
+  }
+
+  // Naložimo sliko v Cloudinary mapo 'budgetwise_avatars'
+  const imageUrl = await uploadToCloudinary(req.file.buffer, 'budgetwise_avatars');
+
+  // Takoj posodobimo uporabnika v bazi
+  const user = await prisma.user.update({
+    where: { id: req.user!.id },
+    data: { avatarUrl: imageUrl },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      avatarUrl: true,
+    },
+  });
+
+  return success(res, {
+    message: 'Profilna slika uspešno posodobljena',
+    user,
+  });
 }

@@ -6,6 +6,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -95,12 +96,21 @@ export default function HomeScreen() {
           </View>
           <TouchableOpacity
             onPress={() => router.push('/(tabs)/profile' as any)}  // ← ZAMENJAJ logout z router.push
-            style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.card, borderWidth: 0.5, borderColor: '#5C1A28', alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.card, borderWidth: 0.5, borderColor: '#5C1A28', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={{ color: C.accent, fontWeight: '600', fontSize: 14 }}>
-              {(user?.firstName?.[0] ?? 'U').toUpperCase()}
-            </Text>
+           {user?.avatarUrl ? (
+              // Če ima uporabnik sliko na Cloudinaryju, jo izrišemo tukaj
+              <Image 
+                source={{ uri: user.avatarUrl }} 
+                style={{ width: '100%', height: '100%' }} 
+              />
+            ) : (
+              // Če slike ni, ostane stara prva črka imena
+              <Text style={{ color: C.accent, fontWeight: '600', fontSize: 14 }}>
+                {(user?.firstName?.[0] ?? 'U').toUpperCase()}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 

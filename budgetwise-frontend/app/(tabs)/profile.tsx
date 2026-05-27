@@ -9,6 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 const C = {
   bg1: '#070508', bg2: '#0D090C', card: '#120810',
@@ -25,6 +27,7 @@ export default function ProfileScreen() {
   const [notifyBudget, setNotifyBudget] = useState(true);
   const [notifyWeekly, setNotifyWeekly] = useState(true);
   const [notifyGoal, setNotifyGoal]   = useState(true);
+  const [uploading, setUploading] = useState(false);
 
   const initials = [user?.firstName?.[0], user?.lastName?.[0]]
     .filter(Boolean).join('').toUpperCase() || user?.email?.[0]?.toUpperCase() || '?';
@@ -38,17 +41,69 @@ export default function ProfileScreen() {
       }},
     ]);
 
+    const handlePickImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permissionResult.granted === false) {
+      Alert.alert('Dovoljenje zavrnjeno', 'Aplikacija potrebuje dostop do galerije.');
+      return;
+    }
+
+const result = await ImagePicker.launchImageLibraryAsync({
+  mediaTypes: 'images' as any, // s tem utišamo TypeScript in Expo bo točno vedel kaj narediti
+  allowsEditing: true,
+  aspect: [1, 1],
+  quality: 0.7,
+});
+
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const selectedImage = result.assets[0];
+    const formData = new FormData();
+    formData.append('avatar', {
+      uri: selectedImage.uri,
+      name: selectedImage.fileName || 'avatar.png',
+      type: selectedImage.mimeType || 'image/png',
+    } as any);
+
+    setUploading(true);
+    try {
+      await api.post('/users/upload-avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      Alert.alert('Uspeh', 'Profilna slika posodobljena.');
+      await refreshUser();
+    } catch (e) {
+      Alert.alert('Napaka', 'Nalaganje slike ni uspelo.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
         {/* ── Glava ── */}
         <View style={styles.header}>
-          <View style={styles.avatarWrap}>
-            <LinearGradient colors={[C.deep, C.accent]} style={styles.avatar}>
-              <Text style={styles.initials}>{initials}</Text>
-            </LinearGradient>
-          </View>
+          <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage} disabled={uploading} activeOpacity={0.8}>
+            <View style={styles.avatarWrap}>
+              {user?.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <LinearGradient colors={[C.deep, C.accent]} style={styles.avatar}>
+                  <Text style={styles.initials}>{initials}</Text>
+                </LinearGradient>
+              )}
+              {uploading && (
+                <View style={styles.avatarLoader}>
+                  <ActivityIndicator size="small" color={C.text1} />
+                </View>
+              )}
+            </View>
+            <View style={styles.cameraIconBadge}>
+              <Ionicons name="camera" size={14} color={C.text1} />
+            </View>
+          </TouchableOpacity>
           <Text style={styles.name}>
             {[user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Brez imena'}
           </Text>
@@ -281,15 +336,19 @@ function PasswordInput({ label, value, onChange, show, onToggle }: {
   );
 }
 
-// ─── Stili ───────────────────────────────────────────────────────────────────
+// ─── Stili (Popolnoma očiščeni in združeni) ───────────────────────────────────
 
 const styles = StyleSheet.create({
   safe:         { flex: 1, backgroundColor: C.bg1 },
   content:      { paddingBottom: 60 },
 
   header:       { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 24 },
-  avatarWrap:   { marginBottom: 14 },
+  avatarContainer: { position: 'relative', marginBottom: 14 },
+  avatarWrap:   { width: 80, height: 80, borderRadius: 40, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg2 },
   avatar:       { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
+  avatarImage:  { width: 80, height: 80, borderRadius: 40 },
+  avatarLoader: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(7, 5, 8, 0.6)', justifyContent: 'center', alignItems: 'center' },
+  cameraIconBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: C.accent, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.bg1 },
   initials:     { fontSize: 30, fontWeight: '600', color: C.text1 },
   name:         { fontSize: 20, fontWeight: '600', color: C.text1, marginBottom: 4 },
   email:        { fontSize: 13, color: C.text3 },
