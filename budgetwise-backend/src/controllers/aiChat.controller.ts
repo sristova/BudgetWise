@@ -2,7 +2,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { success, noContent } from '../lib/response';
+import { noContent, success } from '../lib/response';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY!;
 
@@ -49,7 +49,7 @@ export async function sendMessage(req: Request, res: Response) {
       'Authorization': `Bearer ${GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
       max_tokens: 512,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
@@ -84,7 +84,7 @@ export async function clearHistory(req: Request, res: Response) {
 const RECEIPT_CATEGORIES = ['Hrana', 'Restavracije', 'Kavarne', 'Prevoz', 'Zabava', 'Zdravje', 'Oblačila', 'Sport', 'Potovanje', 'Ostalo'] as const;
 
 const ParseReceiptSchema = z.object({
-  imageBase64: z.string().min(1),
+  imageBase64: z.string().min(1).max(14_000_000),
 });
 
 export async function parseReceipt(req: Request, res: Response) {

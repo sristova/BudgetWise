@@ -87,19 +87,24 @@ interface ParsedInvoice {
 
 // ─── Receipt parsing — Kliče backend preko uradne instance 
 async function parseReceiptViaBackend(base64Image: string): Promise<ParsedInvoice> {
-  //  Uporabimo uradni 'api' objekt, ki sam doda Bearer žeton in ustrezen IP naslov!
-  const response = await api.post("/ai-chat/parse-receipt", { 
-    imageBase64: base64Image 
-  });
-
-  const parsed = response.data?.data;
-
-  return {
-    merchant: parsed?.merchant ?? "",
-    amount: String(parsed?.amount ?? ""),
-    date: parsed?.date ?? new Date().toLocaleDateString("sl-SI"),
-    category: parsed?.category ?? "Ostalo",
-  };
+  try {
+    const response = await api.post("/ai-chat/parse-receipt", 
+      { imageBase64: base64Image },
+      { timeout: 60_000 }
+    );
+    const parsed = response.data?.data;
+    return {
+      merchant: parsed?.merchant ?? "",
+      amount: String(parsed?.amount ?? ""),
+      date: parsed?.date ?? new Date().toLocaleDateString("sl-SI"),
+      category: parsed?.category ?? "Ostalo",
+    };
+  } catch (e: any) {
+    // Pokaži točno kaj backend vrne
+    console.error('STATUS:', e?.response?.status);
+    console.error('BACKEND ERROR:', JSON.stringify(e?.response?.data, null, 2));
+    throw e;
+  }
 }
 
 // ─── Filter Bar 
@@ -429,9 +434,8 @@ useEffect(() => {
             return;
           }
 
-          const result = await ImagePicker.launchCameraAsync({
-            base64: true,
-            quality: 0.8,
+           const result = await ImagePicker.launchCameraAsync({ 
+              quality: 1,
           });
 
           if (!result.canceled) {
@@ -465,44 +469,60 @@ useEffect(() => {
   };
 
   const processImage = async (asset: ImagePicker.ImagePickerAsset) => {
-    setScanning(true);
+  setScanning(true);
 
-    try {
-      if (!asset.base64) {
-        throw new Error("Ni base64 slike");
-      }
+  try {
+    const manipulated = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      [{ resize: { width: 1200 } }], // max 1200px širina je dovolj za OCR
+      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+    );
 
-      const parsed = await parseReceiptViaBackend(asset.base64);
-
-      setParsedInvoice({
-        merchant: parsed.merchant,
-        amount: parsed.amount,
-        date: parsed.date,
-        category: parsed.category,
-        note: "",
-        collection: parsed.category,
-      });
-
-      setFormVisible(true);
-    } catch (e: any) {
-      console.error(e);
-      Alert.alert("Napaka", e?.message ?? "Računa ni bilo mogoče analizirati.");
-    } finally {
-      setScanning(false);
+    if (!manipulated.base64) {
+      throw new Error('Kompresija slike ni uspela');
     }
-  };
+
+    const parsed = await parseReceiptViaBackend(manipulated.base64);
+
+    setParsedInvoice({
+      merchant: parsed.merchant,
+      amount: parsed.amount,
+      date: parsed.date,
+      category: parsed.category,
+      note: '',
+      collection: parsed.category,
+    }); 
+    setFormVisible(true);
+  } catch (e: any) {
+    console.error(e);
+    Alert.alert('Napaka', e?.message ?? 'Računa ni bilo mogoče analizirati.');
+  } finally {
+    setScanning(false);
+  } 
+};
 
   const handleSave = async (data: InvoiceData) => {
   try {
-    const amountNum = parseFloat(data.amount || '0');
+
+    const cleanAmount = String(data.amount).replace(/[^0-9.]/g, '');
+    const amountNum = parseFloat(cleanAmount || '0');
+    
+    // Poišči categoryId po imenu
+    const allCategories = await categoriesApi.getAll();
+    const matched = allCategories.find(
+      (c: any) => c.name.toLowerCase() === data.category.toLowerCase()
+    );
+
     await transactionsApi.create({
       type: 'EXPENSE',
       amount: amountNum,
-      description: data.merchant,
-      date: new Date().toISOString().split('T')[0], 
+      description: data.merchant || 'Skeniran račun',
+      date: data.date || new Date().toISOString().split('T')[0],
       note: data.note,
+      ...(matched && { categoryId: matched.id }),
     });
-    await fetchTransactions(); // osveži seznam iz baze
+
+    await fetchTransactions();
     setFormVisible(false);
   } catch (err) {
     Alert.alert('Napaka', 'Transakcije ni bilo mogoče shraniti.');
