@@ -7,6 +7,12 @@ import {
   TouchableOpacity,
   View,
   Image,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,10 +41,16 @@ interface DashboardData {
   recentTransactions: Array<{
     id: string;
     description: string;
-    category?: { name: string; icon: string };
+    category?: { name: string; icon: string; id?: string };
     amount: number;
     type: 'INCOME' | 'EXPENSE';
     date: string;
+  }>;
+  categories?: Array<{
+    id: string;
+    name: string;
+    icon: string;
+    color: string;
   }>;
 }
 
@@ -47,35 +59,82 @@ function formatCurrency(amount: number, currency = 'EUR') {
 }
 
 export default function HomeScreen() {
-  const { user, logout, isReady, isAuthenticated } = useAuth();
+  const { user, isReady, isAuthenticated } = useAuth();
   const router = useRouter();
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const dashboard = await transactionsApi.getDashboard();
-      setData(dashboard);
-    } catch (err) {
-      console.error('Dashboard load error:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  // Stanja za modalno okno
+  const [modalVisible, setModalVisible] = useState(false);
+  const [transactionType, setTransactionType] = useState<'INCOME' | 'EXPENSE'>('EXPENSE');
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
+
+const load = useCallback(async (silent = false) => {
+  if (!silent) setLoading(true);
+  try {
+    const dashboard = await transactionsApi.getDashboard();
+    setData({
+      balance: dashboard.currentMonth.balance,
+      totalIncome: dashboard.currentMonth.income,
+      totalExpenses: dashboard.currentMonth.expenses,
+      weeklySpending: dashboard.weeklySpending ?? [0, 0, 0, 0, 0, 0, 0],
+      recentTransactions: dashboard.recentTransactions ?? [],
+      categories: dashboard.categories ?? [],
+    });
+  } catch (err) {
+    console.error('Dashboard load error:', err);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+}, []);
 
   useEffect(() => {
-  if (!isReady || !isAuthenticated) return; // ← počakaj da AuthContext konča
-  load();
-}, [isReady, isAuthenticated, load]);
+    if (!isReady || !isAuthenticated) return;
+    load();
+  }, [isReady, isAuthenticated, load]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     load(true);
   }, [load]);
+
+  const handleCreateTransaction = async () => {
+    if (!amount || !description) {
+      Alert.alert('Napaka', 'Prosimo, izpolnite vsa polja.');
+      return;
+    }
+
+    if (transactionType === 'EXPENSE' && !categoryId) {
+      Alert.alert('Napaka', 'Prosimo, izberite kategorijo za strošek.');
+      return;
+    }
+
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      await transactionsApi.create({
+        amount: parseFloat(amount),
+        description,
+        type: transactionType,
+        date: todayStr,
+        categoryId: transactionType === 'INCOME' ? undefined : categoryId,
+      });
+
+      setModalVisible(false);
+      setDescription('');
+      setAmount('');
+      setCategoryId(undefined);
+      load(true); // Tiho osvežimo podatke na zaslonu
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Napaka', 'Ni uspelo dodati transakcije.');
+    }
+  };
 
   const bars: number[] = data?.weeklySpending ?? [0, 0, 0, 0, 0, 0, 0];
   const barMax = Math.max(...bars, 1);
@@ -95,18 +154,16 @@ export default function HomeScreen() {
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => router.push('/(tabs)/profile' as any)}  // ← ZAMENJAJ logout z router.push
+            onPress={() => router.push('/(tabs)/profile' as any)}
             style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.card, borderWidth: 0.5, borderColor: '#5C1A28', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-           {user?.avatarUrl ? (
-              // Če ima uporabnik sliko na Cloudinaryju, jo izrišemo tukaj
+            {user?.avatarUrl ? (
               <Image 
                 source={{ uri: user.avatarUrl }} 
                 style={{ width: '100%', height: '100%' }} 
               />
             ) : (
-              // Če slike ni, ostane stara prva črka imena
               <Text style={{ color: C.accent, fontWeight: '600', fontSize: 14 }}>
                 {(user?.firstName?.[0] ?? 'U').toUpperCase()}
               </Text>
@@ -121,31 +178,57 @@ export default function HomeScreen() {
           </View>
         ) : (
           <>
-            {/* ── Balance card ── */}
-            <View style={{ backgroundColor: C.accent, margin: 16, borderRadius: 16, padding: 20 }}>
-              <Text style={{ fontSize: 11, color: 'rgba(245,238,232,0.7)', letterSpacing: 0.08 }}>SKUPNO STANJE</Text>
-              <Text style={{ fontSize: 32, fontWeight: '500', color: C.text1, marginTop: 4, marginBottom: 16 }}>
-                {formatCurrency(data?.balance ?? 0, user?.currency)}
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="arrow-down" size={12} color={C.warm} />
-                    <Text style={{ fontSize: 10, color: 'rgba(245,238,232,0.75)' }}>Prihodki</Text>
+            {/* ── FINANČNI PREGLED (Preostanek, Prihodki, Stroški) ── */}
+            <View style={{ paddingHorizontal: 16, marginTop: 16, marginBottom: 8 }}>
+              
+              {/* 1. Kartica: Preostanek denarja */}
+              <View style={{ backgroundColor: C.card, borderRadius: 16, padding: 18, marginBottom: 12, borderWidth: 0.5, borderColor: C.border2 }}>
+                <Text style={{ color: C.text3, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Preostanek denarja
+                </Text>
+                <Text style={{ color: C.text1, fontSize: 30, fontWeight: '700', marginTop: 4 }}>
+                  {formatCurrency(data?.balance ?? 0, user?.currency)}
+                </Text>
+              </View>
+
+              {/* Vrstica z dvema ločenima karticama za Prihodke in Stroške */}
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                
+                {/* 2. Kartica: Prihodki */}
+                <TouchableOpacity
+                  onPress={() => {
+                    setTransactionType('INCOME');
+                    setCategoryId(undefined);
+                    setModalVisible(true);
+                  }}
+                  style={{ flex: 1, backgroundColor: C.card, borderRadius: 16, padding: 16, borderWidth: 0.5, borderColor: C.border2 }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="arrow-down-circle" size={16} color="#4CD964" />
+                    <Text style={{ color: C.text2, fontSize: 12, fontWeight: '500' }}>Prihodki</Text>
                   </View>
-                  <Text style={{ fontSize: 15, fontWeight: '500', color: C.text1, marginTop: 3 }}>
+                  <Text style={{ color: '#4CD964', fontSize: 18, fontWeight: '600', marginTop: 6 }}>
                     {formatCurrency(data?.totalIncome ?? 0, user?.currency)}
                   </Text>
-                </View>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="arrow-up" size={12} color={C.accent} />
-                    <Text style={{ fontSize: 10, color: 'rgba(245,238,232,0.75)' }}>Stroški</Text>
+                </TouchableOpacity>
+
+                {/* 3. Kartica: Stroški */}
+                <TouchableOpacity
+                  onPress={() => {
+                    setTransactionType('EXPENSE');
+                    setModalVisible(true);
+                  }}
+                  style={{ flex: 1, backgroundColor: C.card, borderRadius: 16, padding: 16, borderWidth: 0.5, borderColor: C.border2 }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="arrow-up-circle" size={16} color={C.accent} />
+                    <Text style={{ color: C.text2, fontSize: 12, fontWeight: '500' }}>Stroški</Text>
                   </View>
-                  <Text style={{ fontSize: 15, fontWeight: '500', color: C.text1, marginTop: 3 }}>
+                  <Text style={{ color: C.accent, fontSize: 18, fontWeight: '600', marginTop: 6 }}>
                     {formatCurrency(data?.totalExpenses ?? 0, user?.currency)}
                   </Text>
-                </View>
+                </TouchableOpacity>
+
               </View>
             </View>
 
@@ -154,15 +237,14 @@ export default function HomeScreen() {
               <Text style={{ fontSize: 11, color: C.text3, letterSpacing: 0.08, marginBottom: 10, textTransform: 'uppercase' }}>HITER DOSTOP</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
                 {[
-                { label: 'Dodaj strošek', icon: 'add-circle-outline' as const, screen: '/transactions' },
-                { label: 'Skeniraj račun', icon: 'camera-outline' as const, screen: '/transactions' },
-                { label: 'Cilji', icon: 'flag-outline' as const, screen: '/goals' },
-                { label: 'AI asistent', icon: 'chatbubble-ellipses-outline' as const, screen: '/assistant' },
-
+                  { label: 'Dodaj strošek', icon: 'add-circle-outline' as const, action: () => { setTransactionType('EXPENSE'); setModalVisible(true); } },
+                  { label: 'Dodaj prihodek', icon: 'download-outline' as const, action: () => { setTransactionType('INCOME'); setCategoryId(undefined); setModalVisible(true); } },
+                  { label: 'Cilji', icon: 'flag-outline' as const, action: () => router.push('/goals' as any) },
+                  { label: 'AI asistent', icon: 'chatbubble-ellipses-outline' as const, action: () => router.push('/assistant' as any) },
                 ].map((a) => (
                   <TouchableOpacity
                     key={a.label}
-                    onPress={() => router.push(a.screen as any)}
+                    onPress={a.action}
                     style={{ width: (width - 42) / 2, backgroundColor: C.bg1, borderWidth: 0.5, borderColor: C.border2, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}
                   >
                     <Ionicons name={a.icon} size={20} color={C.accent} />
@@ -204,14 +286,14 @@ export default function HomeScreen() {
                 ) : (
                   data?.recentTransactions.map((tx) => (
                     <View key={tx.id} style={{ backgroundColor: C.bg1, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 0.5, borderColor: C.border1 }}>
-                      <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#2A0D14', alignItems: 'center', justifyContent: 'center' }}>
+                      <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: tx.type === 'INCOME' ? '#0F2A14' : '#2A0D14', alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ fontSize: 18 }}>{tx.category?.icon ?? (tx.type === 'INCOME' ? '💰' : '💸')}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 14, color: C.text1, fontWeight: '500' }}>{tx.description}</Text>
-                        <Text style={{ fontSize: 12, color: C.text3 }}>{tx.category?.name ?? tx.type}</Text>
+                        <Text style={{ fontSize: 12, color: C.text3 }}>{tx.category?.name ?? (tx.type === 'INCOME' ? 'Prihodek' : 'Strošek')}</Text>
                       </View>
-                      <Text style={{ fontSize: 14, fontWeight: '500', color: tx.type === 'EXPENSE' ? C.accent : C.warm }}>
+                      <Text style={{ fontSize: 14, fontWeight: '500', color: tx.type === 'EXPENSE' ? C.accent : '#4CD964' }}>
                         {tx.type === 'EXPENSE' ? '-' : '+'}{formatCurrency(tx.amount, user?.currency)}
                       </Text>
                     </View>
@@ -223,6 +305,143 @@ export default function HomeScreen() {
         )}
         <View style={{ height: 24 }} />
       </ScrollView>
+
+      {/* ─── MODALNO OKNO ZA DODAJANJE ─── */}
+      <Modal visible={modalVisible} animationType="slide" transparent={true} onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.sheetOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetContainer}>
+            <View style={styles.sheetHandle} />
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={styles.sheetTitle}>
+                {transactionType === 'INCOME' ? 'Dodaj prihodek' : 'Dodaj strošek'}
+              </Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Ionicons name="close-circle" size={24} color={C.text3} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Vnos zneska */}
+            <Text style={styles.label}>Znesek</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0.00"
+              placeholderTextColor={C.text3}
+              keyboardType="decimal-pad"
+              value={amount}
+              onChangeText={setAmount}
+            />
+
+            {/* Vnos opisa */}
+            <Text style={styles.label}>Opis transakcije</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={transactionType === 'INCOME' ? 'Plača, Božičnica, Prodaja...' : 'Trgovina, Kosilo, Bencin...'}
+              placeholderTextColor={C.text3}
+              value={description}
+              onChangeText={setDescription}
+            />
+
+            {/* Izbira kategorije — Prikaže se samo pri stroških */}
+            {transactionType === 'EXPENSE' && data?.categories && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={styles.label}>Kategorija</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                  {data.categories.map((cat) => {
+                    const isSelected = categoryId === cat.id;
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        onPress={() => setCategoryId(cat.id)}
+                        style={[
+                          styles.categoryBadge,
+                          isSelected && { backgroundColor: C.accent, borderColor: C.accent }
+                        ]}
+                      >
+                        <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
+                        <Text style={{ color: isSelected ? C.text1 : C.text2, fontSize: 12, fontWeight: '500' }}>
+                          {cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Gumb za shranjevanje */}
+            <TouchableOpacity onPress={handleCreateTransaction} style={styles.submitBtn}>
+              <Text style={{ color: C.text1, fontSize: 15, fontWeight: '600' }}>Shrani transakcijo</Text>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  sheetContainer: {
+    backgroundColor: C.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    borderWidth: 0.5,
+    borderColor: C.border2,
+    maxHeight: '85%',
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: C.border2,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: C.text1,
+  },
+  label: {
+    fontSize: 11,
+    color: C.text3,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  input: {
+    backgroundColor: C.bg1,
+    borderRadius: 10,
+    padding: 12,
+    color: C.text1,
+    borderWidth: 0.5,
+    borderColor: C.border2,
+    marginBottom: 16,
+    fontSize: 14,
+  },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: C.bg1,
+    borderWidth: 0.5,
+    borderColor: C.border2,
+  },
+  submitBtn: {
+    backgroundColor: C.accent,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: Platform.OS === 'ios' ? 20 : 0,
+  },
+});

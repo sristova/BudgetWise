@@ -1,6 +1,7 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "forceConsistentCasingInFileNames": false,
     "strict": true,
     "paths": {
       "@/*": [
@@ -14,4 +15,6 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ]
+
 }
+

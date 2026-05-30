@@ -4,14 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useEffect } from 'react';
 import { aiChatApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-
-
-const C = {
-  bg1:'#070508', bg2:'#0D090C', card:'#120810',
-  accent:'#A0263A', warm:'#C4967A',
-  border1:'#251018', border2:'#3D1020',
-  text1:'#F5EEE8', text2:'#C8B8B0', text3:'#5C4A50',
-};
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface Message {
   id: string;
@@ -20,6 +13,7 @@ interface Message {
 }
 
 export default function AssistantScreen() {
+  const { colors: C } = useTheme();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');

@@ -44,7 +44,8 @@ function getDateRange(year: number, month: number) {
 async function getMonthTotals(userId: string, year: number, month: number) {
   const { start, end } = getDateRange(year, month);
 
-  const [income, expenses] = await Promise.all([
+  // 1. Vzporedno pridobimo prihodke, stroške in DEJANSKE PRIHRANKE (Cilje)
+  const [income, expenses, goalsSum] = await Promise.all([
     prisma.transaction.aggregate({
       where: {
         userId,
@@ -63,14 +64,27 @@ async function getMonthTotals(userId: string, year: number, month: number) {
       _sum: { amount: true },
       _count: true,
     }),
+    // TUKAJ POTEGNEMO DEJANSKE PRIHRANKE: Seštejemo trenutne zneske na tvojih ciljih
+    prisma.goal.aggregate({
+      where: {
+        userId,
+        createdAt: { gte: start, lte: end }, // Prihranki ustvarjeni v tem mesecu
+      },
+      _sum: { currentAmount: true },
+    }),
   ]);
 
   const totalIncome = toNumber(income._sum.amount);
   const totalExpenses = toNumber(expenses._sum.amount);
-  const netSavings = totalIncome - totalExpenses;
+  
+  // POPRAVEK: Neto prihranki so zdaj DEJANSKA vsota na tvojih ciljih, ne pa izračun z minusom!
+  const netSavings = toNumber(goalsSum._sum.currentAmount);
+
+  // Stopnja varčevanja glede na to, koliko prihodkov si dala dejansko na stran
   const savingsRate = totalIncome > 0
     ? parseFloat(((netSavings / totalIncome) * 100).toFixed(1))
     : 0;
+    
   const transactionCount = income._count + expenses._count;
 
   return { totalIncome, totalExpenses, netSavings, savingsRate, transactionCount };
