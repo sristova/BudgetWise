@@ -10,9 +10,97 @@ if (!GROQ_API_KEY) {
   throw new Error('GROQ_API_KEY is not set in environment variables');
 }
 
-const SYSTEM_PROMPT = `Si finančni asistent v aplikaciji BudgetWise. Govoriš slovensko, si prijazen in koncizen.
+const BASE_SYSTEM_PROMPT = `Si finančni asistent v aplikaciji BudgetWise. Govoriš slovensko, si prijazen in koncizen.
 Pomagaš uporabnikom z vprašanji o osebnih financah, varčevanju in proračunu.
 Odgovarjaj kratko (2-4 stavki) in praktično.`;
+
+async function buildSystemPrompt(userId: string): Promise<string> {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+  const [transactions, budgets, goals] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { userId, date: { gte: startOfMonth, lte: endOfMonth } },
+      include: { category: true },
+      orderBy: { date: 'desc' },
+      take: 50,
+    }),
+    prisma.budget.findMany({
+      where: { userId, isActive: true },
+      include: { category: true },
+    }),
+    prisma.goal.findMany({
+      where: { userId, status: 'ACTIVE' },
+    }),
+  ]);
+
+  const expenses = transactions.filter(t => t.type === 'EXPENSE');
+  const income = transactions.filter(t => t.type === 'INCOME');
+
+  const totalExpenses = expenses.reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalIncome = income.reduce((sum, t) => sum + Number(t.amount), 0);
+
+  // Group expenses by category
+  const byCategory = expenses.reduce<Record<string, number>>((acc, t) => {
+    const name = t.category?.name ?? 'Ostalo';
+    acc[name] = (acc[name] ?? 0) + Number(t.amount);
+    return acc;
+  }, {});
+
+  const topCategories = Object.entries(byCategory)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([name, total]) => `${name}: ${total.toFixed(2)}€`)
+    .join(', ') || 'Ni stroškov ta mesec.';
+
+  const recentTransactions = transactions
+    .slice(0, 8)
+    .map(t => `${t.description} (${t.type === 'EXPENSE' ? '-' : '+'}${Number(t.amount).toFixed(2)}€)`)
+    .join(', ') || 'Ni transakcij ta mesec.';
+
+  const budgetSummary = budgets.length > 0
+    ? budgets.map(b => {
+        const spent = b.category ? (byCategory[b.category.name] ?? 0) : 0;
+        const limit = Number(b.amount);
+        const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+        return `${b.name}: ${spent.toFixed(2)}€ / ${limit.toFixed(2)}€ (${pct}%)`;
+      }).join(', ')
+    : 'Ni nastavljenih proračunov.';
+
+  const goalsSummary = goals.length > 0
+    ? goals.map(g => {
+        const current = Number(g.currentAmount);
+        const target = Number(g.targetAmount);
+        const pct = target > 0 ? Math.round((current / target) * 100) : 0;
+        const deadline = g.deadline ? `, rok: ${g.deadline.toLocaleDateString('sl-SI')}` : '';
+        return `${g.name}: ${current.toFixed(2)}€ / ${target.toFixed(2)}€ (${pct}%${deadline})`;
+      }).join(', ')
+    : 'Ni aktivnih ciljev.';
+
+  const monthLabel = now.toLocaleString('sl-SI', { month: 'long', year: 'numeric' });
+
+  return `${BASE_SYSTEM_PROMPT}
+
+## Uporabnikovi finančni podatki za ${monthLabel}:
+- Skupni prihodki: ${totalIncome.toFixed(2)}€
+- Skupni stroški: ${totalExpenses.toFixed(2)}€
+- Prihranki: ${(totalIncome - totalExpenses).toFixed(2)}€
+
+### Top kategorije stroškov:
+${topCategories}
+
+### Aktivni proračuni:
+${budgetSummary}
+
+### Varčevalni cilji:
+${goalsSummary}
+
+### Zadnje transakcije:
+${recentTransactions}
+
+Ko odgovarjaš, upoštevaj zgornje podatke. Če te vprašajo o stroških, proračunu ali ciljih, odgovori na podlagi teh konkretnih podatkov.`;
+}
 
 export async function getChatHistory(req: Request, res: Response) {
   const { limit } = z.object({ limit: z.coerce.number().int().min(1).max(100).default(50) }).parse(req.query);
@@ -41,7 +129,10 @@ export async function sendMessage(req: Request, res: Response) {
     take: 20,
   });
 
-  // Call Groq — ključ je SAMO tukaj na backendu
+  // Build system prompt with real financial data
+  const systemPrompt = await buildSystemPrompt(userId);
+
+  // Call Groq
   const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -52,7 +143,7 @@ export async function sendMessage(req: Request, res: Response) {
       model: 'meta-llama/llama-4-scout-17b-16e-instruct',
       max_tokens: 512,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         ...history.map(m => ({ role: m.role, content: m.content })),
       ],
     }),
@@ -68,7 +159,7 @@ export async function sendMessage(req: Request, res: Response) {
   const tokens = data.usage?.total_tokens;
 
   // Save AI response
-  const aiMessage = await prisma.aiChat.create({
+  await prisma.aiChat.create({
     data: { userId, role: 'assistant', content: aiText, tokens },
   });
 
@@ -145,7 +236,6 @@ Pravila:
 
   let parsed: { merchant: string; amount: string; date: string; category: string };
   try {
-    // Strip possible markdown code fences
     const cleaned = raw.replace(/```json|```/g, '').trim();
     parsed = JSON.parse(cleaned);
   } catch {

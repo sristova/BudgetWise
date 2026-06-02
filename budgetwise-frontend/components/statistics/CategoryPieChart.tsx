@@ -2,18 +2,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
+import { useTheme } from '@/contexts/ThemeContext';
 import type { CategoryStat } from '../../types/report';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const C = {
-  bg1: '#070508',
-  border1: '#251018',
-  text1: '#F5EEE8',
-  text2: '#C8B8B0',
-  text3: '#5C4A50',
-  accent: '#A0263A',
-} as const;
 
 // Fallback colors for categories without color
 const PALETTE = [
@@ -27,10 +19,12 @@ interface CategoryPieChartProps {
 }
 
 export function CategoryPieChart({ categories, currency = '€' }: CategoryPieChartProps) {
+  const { colors: C } = useTheme();
+
   if (!categories || categories.length === 0) {
     return (
-      <View style={styles.empty}>
-        <Text style={styles.emptyText}>Ni podatkov za ta mesec</Text>
+      <View style={[styles.empty, { borderColor: C.border1 }]}>
+        <Text style={[styles.emptyText, { color: C.text3 }]}>Ni podatkov za ta mesec</Text>
       </View>
     );
   }
@@ -52,7 +46,7 @@ export function CategoryPieChart({ categories, currency = '€' }: CategoryPieCh
       ? [{
           name: 'Ostalo',
           population: otherTotal,
-          color: '#3D2030',
+          color: C.border2,
           legendFontColor: C.text2,
           legendFontSize: 12,
         }]
@@ -60,7 +54,7 @@ export function CategoryPieChart({ categories, currency = '€' }: CategoryPieCh
   ];
 
   const chartConfig = {
-    color: (opacity = 1) => `rgba(245, 238, 232, ${opacity})`,
+    color: (opacity = 1) => `${C.text1}${Math.round(opacity * 255).toString(16).padStart(2, '0')}`,
     backgroundColor: C.bg1,
     backgroundGradientFrom: C.bg1,
     backgroundGradientTo: C.bg1,
@@ -93,11 +87,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 0.5,
-    borderColor: C.border1,
     borderRadius: 12,
   },
   emptyText: {
-    color: C.text3,
     fontSize: 13,
   },
 });

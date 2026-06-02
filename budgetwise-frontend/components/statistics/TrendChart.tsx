@@ -2,22 +2,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
+import { useTheme } from '@/contexts/ThemeContext';
 import type { TrendPoint } from '../../types/report';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const C = {
-  bg1: '#070508',
-  bg2: '#0D090C',
-  accent: '#A0263A',
-  warm: '#C4967A',
-  border1: '#251018',
-  border2: '#3D1020',
-  text1: '#F5EEE8',
-  text2: '#C8B8B0',
-  text3: '#5C4A50',
-  green: '#4CAF7D',
-} as const;
 
 type ChartMode = 'expenses' | 'income' | 'savings';
 
@@ -27,19 +15,21 @@ interface TrendChartProps {
   loading?: boolean;
 }
 
-const MODE_CONFIG: Record<ChartMode, { label: string; color: string }> = {
-  expenses: { label: 'Stroški', color: C.accent },
-  income: { label: 'Prihodki', color: C.warm },
-  savings: { label: 'Prihranki', color: C.green },
-};
-
 export function TrendChart({ points, mode = 'expenses', loading = false }: TrendChartProps) {
+  const { colors: C } = useTheme();
+
+  const MODE_CONFIG: Record<ChartMode, { label: string; color: string }> = {
+    expenses: { label: 'Stroški', color: C.accent },
+    income: { label: 'Prihodki', color: C.warm },
+    savings: { label: 'Prihranki', color: C.green },
+  };
+
   const config = MODE_CONFIG[mode];
-  const chartWidth = SCREEN_WIDTH - 32; // 16px padding each side
+  const chartWidth = SCREEN_WIDTH - 32;
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: C.bg1 }]}>
         <ActivityIndicator color={C.accent} />
       </View>
     );
@@ -47,8 +37,8 @@ export function TrendChart({ points, mode = 'expenses', loading = false }: Trend
 
   if (!points || points.length === 0) {
     return (
-      <View style={[styles.container, styles.emptyContainer]}>
-        <Text style={styles.emptyText}>Ni dovolj podatkov za grafikon</Text>
+      <View style={[styles.container, styles.emptyContainer, { backgroundColor: C.bg1, borderColor: C.border1 }]}>
+        <Text style={[styles.emptyText, { color: C.text3 }]}>Ni dovolj podatkov za grafikon</Text>
       </View>
     );
   }
@@ -79,7 +69,7 @@ export function TrendChart({ points, mode = 'expenses', loading = false }: Trend
     backgroundGradientFrom: C.bg1,
     backgroundGradientTo: C.bg1,
     decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(92, 74, 80, ${opacity})`,
+    color: (opacity = 1) => `${C.border2}${Math.round(opacity * 255).toString(16).padStart(2, '0')}`,
     labelColor: () => C.text3,
     style: { borderRadius: 14 },
     propsForDots: {
@@ -129,24 +119,20 @@ const styles = StyleSheet.create({
   },
   chart: {
     borderRadius: 12,
-    marginHorizontal: -8, // compensate internal chart padding
+    marginHorizontal: -8,
   },
   loadingContainer: {
     height: 180,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: C.bg1,
   },
   emptyContainer: {
     height: 120,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: C.bg1,
     borderWidth: 0.5,
-    borderColor: C.border1,
   },
   emptyText: {
-    color: C.text3,
     fontSize: 13,
   },
 });

@@ -18,57 +18,21 @@ import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { transactionsApi, categoriesApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-
-// UVOZ URADNEGA API KLIENTA 
+import { useTheme } from '@/contexts/ThemeContext';
 import { api } from '@/lib/api';
 
-// ─── Theme 
-const C = {
-  bg1: "#070508",
-  bg2: "#0D090C",
-  card: "#120810",
-  accent: "#A0263A",
-  warm: "#C4967A",
-  border1: "#251018",
-  border2: "#3D1020",
-  text1: "#F5EEE8",
-  text2: "#C8B8B0",
-  text3: "#5C4A50",
-  inactive: "#3A1820",
-  success: "#2A6B3C",
-  successText: "#6FCFA0",
-  inputBg: "#0F0710",
-};
-
-// ─── Static Data 
+// ─── Static Data ──────────────────────────────────────────────────────────────
 const FILTERS = [
-  "Vse",
-  "Hrana",
-  "Restavracije",
-  "Kavarne",
-  "Prevoz",
-  "Zabava",
-  "Zdravje",
-  "Oblačila",
-  "Sport",
-  "Potovanje",
-  "Ostalo",
+  "Vse", "Hrana", "Restavracije", "Kavarne", "Prevoz",
+  "Zabava", "Zdravje", "Oblačila", "Sport", "Potovanje", "Ostalo",
 ];
 
 const DEFAULT_COLLECTIONS = [
-  "Hrana",
-  "Restavracije",
-  "Kavarne",
-  "Prevoz",
-  "Zabava",
-  "Zdravje",
-  "Oblačila",
-  "Sport",
-  "Potovanje",
-  "Ostalo",
+  "Hrana", "Restavracije", "Kavarne", "Prevoz", "Zabava",
+  "Zdravje", "Oblačila", "Sport", "Potovanje", "Ostalo",
 ];
 
-// ─── Types 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface InvoiceData {
   merchant: string;
   amount: string;
@@ -85,10 +49,10 @@ interface ParsedInvoice {
   category: string;
 }
 
-// ─── Receipt parsing — Kliče backend preko uradne instance 
+// ─── Receipt parsing ──────────────────────────────────────────────────────────
 async function parseReceiptViaBackend(base64Image: string): Promise<ParsedInvoice> {
   try {
-    const response = await api.post("/ai-chat/parse-receipt", 
+    const response = await api.post("/ai-chat/parse-receipt",
       { imageBase64: base64Image },
       { timeout: 60_000 }
     );
@@ -100,122 +64,72 @@ async function parseReceiptViaBackend(base64Image: string): Promise<ParsedInvoic
       category: parsed?.category ?? "Ostalo",
     };
   } catch (e: any) {
-    // Pokaži točno kaj backend vrne
     console.error('STATUS:', e?.response?.status);
     console.error('BACKEND ERROR:', JSON.stringify(e?.response?.data, null, 2));
     throw e;
   }
 }
 
-// ─── Filter Bar 
-function FilterBar({
-  active,
-  setActive,
-}: {
-  active: string;
-  setActive: (f: string) => void;
-}) {
+// ─── Filter Bar ───────────────────────────────────────────────────────────────
+function FilterBar({ active, setActive, C }: { active: string; setActive: (f: string) => void; C: any }) {
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        gap: 8,
-        flexDirection: "row",
-      }}
+      contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexDirection: "row" }}
     >
       {FILTERS.map((f) => (
         <TouchableOpacity
           key={f}
           onPress={() => setActive(f)}
           style={{
-            paddingHorizontal: 14,
-            paddingVertical: 6,
-            borderRadius: 20,
+            paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
             borderWidth: 0.5,
             borderColor: active === f ? C.accent : C.border2,
             backgroundColor: active === f ? C.accent : C.bg1,
           }}
         >
-          <Text
-            style={{
-              fontSize: 12,
-              color: active === f ? C.text1 : C.text3,
-            }}
-          >
-            {f}
-          </Text>
+          <Text style={{ fontSize: 12, color: active === f ? C.text1 : C.text3 }}>{f}</Text>
         </TouchableOpacity>
       ))}
     </ScrollView>
   );
 }
 
-// ─── Transaction Card 
-function TxCard({ tx }: { tx: any }) {
+// ─── Transaction Card ─────────────────────────────────────────────────────────
+function TxCard({ tx, C }: { tx: any; C: any }) {
   const isExpense = tx.type === 'EXPENSE';
-  
   return (
     <View style={{
-      backgroundColor: C.bg1,
-      borderRadius: 12,
-      padding: 12,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      borderWidth: 0.5,
-      borderColor: C.border1,
+      backgroundColor: C.bg1, borderRadius: 12, padding: 12,
+      flexDirection: "row", alignItems: "center", gap: 12,
+      borderWidth: 0.5, borderColor: C.border1,
     }}>
       <View style={{
-        width: 38,
-        height: 38,
-        borderRadius: 10,
-        backgroundColor: C.border2,
-        alignItems: "center",
-        justifyContent: "center",
+        width: 38, height: 38, borderRadius: 10, backgroundColor: C.border2,
+        alignItems: "center", justifyContent: "center",
       }}>
         <Text style={{ fontSize: 18 }}>
           {tx.category?.icon ?? (isExpense ? '💸' : '💚')}
         </Text>
       </View>
-
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, color: C.text1, fontWeight: "500" }}>
-          {tx.description}
-        </Text>
+        <Text style={{ fontSize: 14, color: C.text1, fontWeight: "500" }}>{tx.description}</Text>
         <Text style={{ fontSize: 12, color: C.text3 }}>
           {tx.category?.name ?? 'Nekategorizirano'} · {tx.date?.split('T')[0]}
         </Text>
       </View>
-
-      <Text style={{
-        fontSize: 14,
-        fontWeight: "500",
-        color: isExpense ? C.accent : C.warm,
-      }}>
+      <Text style={{ fontSize: 14, fontWeight: "500", color: isExpense ? C.accent : C.warm }}>
         {isExpense ? '-' : '+'}€{parseFloat(tx.amount).toFixed(2)}
       </Text>
     </View>
   );
 }
 
-// ─── Invoice Modal 
-function InvoiceFormModal({
-  visible,
-  data,
-  collections,
-  onClose,
-  onSave,
-}: any) {
+// ─── Invoice Modal ────────────────────────────────────────────────────────────
+function InvoiceFormModal({ visible, data, collections, onClose, onSave, C }: any) {
   const [form, setForm] = useState<InvoiceData>({
-    merchant: "",
-    amount: "",
-    date: "",
-    category: "Ostalo",
-    note: "",
-    collection: "Ostalo",
+    merchant: "", amount: "", date: "", category: "Ostalo", note: "", collection: "Ostalo",
   });
 
   useEffect(() => {
@@ -231,34 +145,19 @@ function InvoiceFormModal({
     }
   }, [visible, data]);
 
-  const field = (
-    label: string,
-    key: keyof InvoiceData,
-    keyboard: any = "default",
-  ) => (
+  const field = (label: string, key: keyof InvoiceData, keyboard: any = "default") => (
     <View style={{ marginBottom: 14 }}>
-      <Text
-        style={{
-          fontSize: 11,
-          color: C.text3,
-          marginBottom: 4,
-          textTransform: "uppercase",
-        }}
-      >
+      <Text style={{ fontSize: 11, color: C.text3, marginBottom: 4, textTransform: "uppercase" }}>
         {label}
       </Text>
-
       <TextInput
         value={form[key]}
         onChangeText={(v) => setForm((f) => ({ ...f, [key]: v }))}
         keyboardType={keyboard}
+        placeholderTextColor={C.text3}
         style={{
-          backgroundColor: C.inputBg,
-          borderRadius: 10,
-          padding: 12,
-          color: C.text1,
-          borderWidth: 0.5,
-          borderColor: C.border2,
+          backgroundColor: C.inputBg, borderRadius: 10, padding: 12,
+          color: C.text1, borderWidth: 0.5, borderColor: C.border2,
         }}
       />
     </View>
@@ -266,122 +165,54 @@ function InvoiceFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.8)",
-            justifyContent: "flex-end",
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: C.bg2,
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-              padding: 20,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                marginBottom: 20,
-              }}
-            >
-              <Text
-                style={{
-                  color: C.text1,
-                  fontSize: 18,
-                  fontWeight: "600",
-                }}
-              >
-                📄 Račun
-              </Text>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.8)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: C.bg2, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
 
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 20 }}>
+              <Text style={{ color: C.text1, fontSize: 18, fontWeight: "600" }}>📄 Račun</Text>
               <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close-circle" size={24} color={C.text3} />
               </TouchableOpacity>
             </View>
 
-            {field("Trgovec", "merchant")}
-            {field("Znesek", "amount", "decimal-pad")}
-            {field("Datum", "date")}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {field("Trgovec / Naziv", "merchant")}
+              {field("Znesek", "amount", "decimal-pad")}
+              {field("Datum", "date")}
 
-            {/* kategorija */}
-            <View style={{ marginBottom: 14 }}>
-              <Text
-                style={{
-                  fontSize: 11,
-                  color: C.text3,
-                  marginBottom: 8,
-                  textTransform: "uppercase",
-                }}
-              >
-                Kategorija
-              </Text>
-              <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-                {[
-                  "Hrana",
-                  "Restavracije",
-                  "Kavarne",
-                  "Prevoz",
-                  "Zabava",
-                  "Zdravje",
-                  "Oblačila",
-                  "Sport",
-                  "Potovanje",
-                  "Ostalo",
-                ].map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    onPress={() => setForm((f) => ({ ...f, category: cat }))}
-                    style={{
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 10,
-                      backgroundColor:
-                        form.category === cat ? C.accent : C.inputBg,
-                      borderWidth: 0.5,
-                      borderColor: form.category === cat ? C.accent : C.border2,
-                    }}
-                  >
-                    <Text
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 11, color: C.text3, marginBottom: 8, textTransform: "uppercase" }}>
+                  Kategorija
+                </Text>
+                <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                  {["Hrana", "Restavracije", "Kavarne", "Prevoz", "Zabava", "Zdravje", "Oblačila", "Sport", "Potovanje", "Ostalo"].map((cat) => (
+                    <TouchableOpacity
+                      key={cat}
+                      onPress={() => setForm((f) => ({ ...f, category: cat }))}
                       style={{
-                        color: form.category === cat ? C.text1 : C.text3,
-                        fontSize: 13,
+                        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+                        backgroundColor: form.category === cat ? C.accent : C.inputBg,
+                        borderWidth: 0.5,
+                        borderColor: form.category === cat ? C.accent : C.border2,
                       }}
                     >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text style={{ color: form.category === cat ? C.text1 : C.text3, fontSize: 13 }}>
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
-            {field("Opomba", "note")}
+
+              {field("Opomba", "note")}
+            </ScrollView>
 
             <TouchableOpacity
               onPress={() => onSave(form)}
-              style={{
-                backgroundColor: C.accent,
-                borderRadius: 12,
-                padding: 14,
-                alignItems: "center",
-                marginTop: 10,
-              }}
+              style={{ backgroundColor: C.accent, borderRadius: 12, padding: 14, alignItems: "center", marginTop: 10 }}
             >
-              <Text
-                style={{
-                  color: C.text1,
-                  fontWeight: "600",
-                  fontSize: 15,
-                }}
-              >
-                💾 Shrani
-              </Text>
+              <Text style={{ color: C.text1, fontWeight: "600", fontSize: 15 }}>💾 Shrani</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -390,8 +221,9 @@ function InvoiceFormModal({
   );
 }
 
-// ─── MAIN SCREEN 
+// ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 export default function TransactionsScreen() {
+  const { colors: C } = useTheme();
   const [active, setActive] = useState("Vse");
   const [transactions, setTransactions] = useState<any[]>([]);
   const [collections] = useState(DEFAULT_COLLECTIONS);
@@ -402,24 +234,20 @@ export default function TransactionsScreen() {
 
   const filterTx = () => {
     if (active === "Vse") return transactions;
-    return transactions.filter(
-      (t) => t.collection === active || t.cat?.includes(active),
-    );
+    return transactions.filter((t) => t.collection === active || t.cat?.includes(active));
   };
 
   const fetchTransactions = useCallback(async () => {
-  if (!isReady || !isAuthenticated) return;
-  try {
-    const res = await transactionsApi.getAll();
-    setTransactions(res.data ?? []);
-  } catch (err) {
-    console.error('Napaka pri nalaganju transakcij:', err);
-  }
-}, [isReady, isAuthenticated]);
+    if (!isReady || !isAuthenticated) return;
+    try {
+      const res = await transactionsApi.getAll();
+      setTransactions(res.data ?? []);
+    } catch (err) {
+      console.error('Napaka pri nalaganju transakcij:', err);
+    }
+  }, [isReady, isAuthenticated]);
 
-useEffect(() => {
-  fetchTransactions();
-}, [fetchTransactions]);
+  useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
   const handleScan = async () => {
     const galleryPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -429,146 +257,74 @@ useEffect(() => {
       {
         text: "📷 Kamera",
         onPress: async () => {
-          if (camPerm.status !== "granted") {
-            Alert.alert("Dovoli dostop do kamere");
-            return;
-          }
-
-           const result = await ImagePicker.launchCameraAsync({ 
-              quality: 1,
-          });
-
-          if (!result.canceled) {
-            await processImage(result.assets[0]);
-          }
+          if (camPerm.status !== "granted") { Alert.alert("Dovoli dostop do kamere"); return; }
+          const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+          if (!result.canceled) await processImage(result.assets[0]);
         },
       },
       {
         text: "🖼 Galerija",
         onPress: async () => {
-          if (galleryPerm.status !== "granted") {
-            Alert.alert("Dovoli dostop do galerije");
-            return;
-          }
-
-          const result = await ImagePicker.launchImageLibraryAsync({
-            base64: true,
-            quality: 0.8,
-          });
-
-          if (!result.canceled) {
-            await processImage(result.assets[0]);
-          }
+          if (galleryPerm.status !== "granted") { Alert.alert("Dovoli dostop do galerije"); return; }
+          const result = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.8 });
+          if (!result.canceled) await processImage(result.assets[0]);
         },
       },
-      {
-        text: "Prekliči",
-        style: "cancel",
-      },
+      { text: "Prekliči", style: "cancel" },
     ]);
   };
 
   const processImage = async (asset: ImagePicker.ImagePickerAsset) => {
-  setScanning(true);
-
-  try {
-    const manipulated = await ImageManipulator.manipulateAsync(
-      asset.uri,
-      [{ resize: { width: 1200 } }], // max 1200px širina je dovolj za OCR
-      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-    );
-
-    if (!manipulated.base64) {
-      throw new Error('Kompresija slike ni uspela');
+    setScanning(true);
+    try {
+      const manipulated = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 1200 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      if (!manipulated.base64) throw new Error('Kompresija slike ni uspela');
+      const parsed = await parseReceiptViaBackend(manipulated.base64);
+      setParsedInvoice({ merchant: parsed.merchant, amount: parsed.amount, date: parsed.date, category: parsed.category, note: '', collection: parsed.category });
+      setFormVisible(true);
+    } catch (e: any) {
+      Alert.alert('Napaka', e?.message ?? 'Računa ni bilo mogoče analizirati.');
+    } finally {
+      setScanning(false);
     }
-
-    const parsed = await parseReceiptViaBackend(manipulated.base64);
-
-    setParsedInvoice({
-      merchant: parsed.merchant,
-      amount: parsed.amount,
-      date: parsed.date,
-      category: parsed.category,
-      note: '',
-      collection: parsed.category,
-    }); 
-    setFormVisible(true);
-  } catch (e: any) {
-    console.error(e);
-    Alert.alert('Napaka', e?.message ?? 'Računa ni bilo mogoče analizirati.');
-  } finally {
-    setScanning(false);
-  } 
-};
+  };
 
   const handleSave = async (data: InvoiceData) => {
-  try {
-
-    const cleanAmount = String(data.amount).replace(/[^0-9.]/g, '');
-    const amountNum = parseFloat(cleanAmount || '0');
-    
-    // Poišči categoryId po imenu
-    const allCategories = await categoriesApi.getAll();
-    const matched = allCategories.find(
-      (c: any) => c.name.toLowerCase() === data.category.toLowerCase()
-    );
-
-    await transactionsApi.create({
-      type: 'EXPENSE',
-      amount: amountNum,
-      description: data.merchant || 'Skeniran račun',
-      date: data.date || new Date().toISOString().split('T')[0],
-      note: data.note,
-      ...(matched && { categoryId: matched.id }),
-    });
-
-    await fetchTransactions();
-    setFormVisible(false);
-  } catch (err) {
-    Alert.alert('Napaka', 'Transakcije ni bilo mogoče shraniti.');
-  }
-};
+    try {
+      const cleanAmount = String(data.amount).replace(/[^0-9.]/g, '');
+      const amountNum = parseFloat(cleanAmount || '0');
+      const allCategories = await categoriesApi.getAll();
+      const matched = allCategories.find((c: any) => c.name.toLowerCase() === data.category.toLowerCase());
+      await transactionsApi.create({
+        type: 'EXPENSE', amount: amountNum,
+        description: data.merchant || 'Skeniran račun',
+        date: data.date || new Date().toISOString().split('T')[0],
+        note: data.note,
+        ...(matched && { categoryId: matched.id }),
+      });
+      await fetchTransactions();
+      setFormVisible(false);
+    } catch (err) {
+      Alert.alert('Napaka', 'Transakcije ni bilo mogoče shraniti.');
+    }
+  };
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: C.bg2,
-      }}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg2 }}>
       {/* Header */}
-      <View
-        style={{
-          backgroundColor: C.bg1,
-          paddingHorizontal: 20,
-          paddingVertical: 14,
-          borderBottomWidth: 0.5,
-          borderBottomColor: C.border1,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: "500",
-            color: C.text1,
-          }}
-        >
-          Transakcije
-        </Text>
-
-        <Text
-          style={{
-            fontSize: 13,
-            color: C.text3,
-            marginTop: 2,
-          }}
-        >
-          Maj 2026
+      <View style={{ backgroundColor: C.bg1, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: C.border1 }}>
+        <Text style={{ fontSize: 18, fontWeight: "500", color: C.text1 }}>Transakcije</Text>
+        <Text style={{ fontSize: 13, color: C.text3, marginTop: 2 }}>
+          {new Date().toLocaleDateString('sl-SI', { month: 'long', year: 'numeric' })}
         </Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        <FilterBar active={active} setActive={setActive} />
+        <FilterBar active={active} setActive={setActive} C={C} />
 
         {/* Scan Button */}
         <TouchableOpacity
@@ -576,55 +332,34 @@ useEffect(() => {
           disabled={scanning}
           style={{
             backgroundColor: scanning ? C.inactive : C.accent,
-            borderRadius: 12,
-            padding: 13,
-            marginHorizontal: 16,
-            marginBottom: 12,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
+            borderRadius: 12, padding: 13, marginHorizontal: 16, marginBottom: 12,
+            flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
           }}
         >
-          {scanning ? (
-            <ActivityIndicator size="small" color={C.text1} />
-          ) : (
-            <Ionicons name="camera" size={18} color={C.text1} />
-          )}
-
-          <Text
-            style={{
-              fontSize: 14,
-              color: C.text1,
-              fontWeight: "500",
-            }}
-          >
+          {scanning
+            ? <ActivityIndicator size="small" color={C.text1} />
+            : <Ionicons name="camera" size={18} color={C.text1} />
+          }
+          <Text style={{ fontSize: 14, color: C.text1, fontWeight: "500" }}>
             {scanning ? "AI analizira račun..." : "Skeniraj račun"}
           </Text>
         </TouchableOpacity>
 
         {/* Transactions */}
-        <View
-          style={{
-            paddingHorizontal: 16,
-            gap: 8,
-          }}
-        >
-          {filterTx().map((tx) => (
-            <TxCard key={tx.id} tx={tx} />
-          ))}
+        <View style={{ paddingHorizontal: 16, gap: 8 }}>
+          {filterTx().map((tx) => <TxCard key={tx.id} tx={tx} C={C} />)}
         </View>
 
         <View style={{ height: 30 }} />
       </ScrollView>
 
-      {/* Modal */}
       <InvoiceFormModal
         visible={formVisible}
         data={parsedInvoice}
         collections={collections}
         onClose={() => setFormVisible(false)}
         onSave={handleSave}
+        C={C}
       />
     </SafeAreaView>
   );

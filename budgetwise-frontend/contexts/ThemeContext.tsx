@@ -33,9 +33,9 @@ export const LIGHT_COLORS = {
   bg1: '#FFFFFF',
   bg2: '#F5F0F2',
   card: '#FDF8FA',
-  accent: '#A0263A',
+  accent: '#b45363', //#A0263A is a strong accent that works in both themes
   warm: '#8B5E3C',
-  deep: '#7A1A2E',
+  deep: '#88404c',   //#7A1A2E is a deep color that provides good contrast in light mode
   muted: '#8C6A5A',
   border1: '#E8D8DC',
   border2: '#D4B8BE',
