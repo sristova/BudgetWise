@@ -4,6 +4,7 @@ import 'express-async-errors';
 import { app } from './app';
 import { logger } from './lib/logger';
 import { prisma } from './lib/prisma';
+import './lib/scheduler'; 
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 

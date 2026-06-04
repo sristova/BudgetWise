@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { success, created, noContent, paginated, buildPaginationMeta } from '../lib/response';
 import { NotFoundError, ForbiddenError } from '../lib/errors';
+import { generateTransactionsPdf } from '../lib/pdf';
 import {
   createTransactionSchema,
   updateTransactionSchema,
@@ -17,7 +18,6 @@ export async function getTransactions(req: Request, res: Response) {
   const { page, limit, type, categoryId, startDate, endDate, search, sortBy, sortOrder } = query;
   const skip = (page - 1) * limit;
 
-  // Build dynamic where clause
   const where: Prisma.TransactionWhereInput = {
     userId,
     ...(type && { type }),
@@ -132,28 +132,25 @@ export async function getDashboardSummary(req: Request, res: Response) {
     recentTransactions,
     topCategories,
     goals,
+    categories,
   ] = await Promise.all([
-    // Current month totals
     prisma.transaction.groupBy({
       by: ['type'],
       where: { userId, date: { gte: startOfMonth, lte: endOfMonth } },
       _sum: { amount: true },
       _count: true,
     }),
-    // Last month totals
     prisma.transaction.groupBy({
       by: ['type'],
       where: { userId, date: { gte: startOfLastMonth, lte: endOfLastMonth } },
       _sum: { amount: true },
     }),
-    // Recent 5 transactions
     prisma.transaction.findMany({
       where: { userId },
       orderBy: { date: 'desc' },
       take: 5,
       include: { category: { select: { name: true, icon: true, color: true } } },
     }),
-    // Top spending categories this month
     prisma.transaction.groupBy({
       by: ['categoryId'],
       where: { userId, type: 'EXPENSE', date: { gte: startOfMonth, lte: endOfMonth } },
@@ -161,11 +158,14 @@ export async function getDashboardSummary(req: Request, res: Response) {
       orderBy: { _sum: { amount: 'desc' } },
       take: 5,
     }),
-    // Active goals
     prisma.goal.findMany({
       where: { userId, status: 'ACTIVE' },
       orderBy: { deadline: 'asc' },
       take: 3,
+    }),
+    prisma.category.findMany({
+      where: { userId },
+      orderBy: { name: 'asc' },
     }),
   ]);
 
@@ -185,5 +185,41 @@ export async function getDashboardSummary(req: Request, res: Response) {
     recentTransactions,
     topCategories,
     goals,
+    categories,
   });
+}
+
+export async function exportTransactionsPdf(req: Request, res: Response) {
+  const userId = req.user!.id;
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const [transactions, user] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { userId, date: { gte: startOfMonth, lte: endOfMonth } },
+      orderBy: { date: 'desc' },
+      include: { category: { select: { name: true, icon: true } } },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, currency: true },
+    }),
+  ]);
+
+  if (!user) throw new NotFoundError('User');
+
+  const month = now.toLocaleDateString('sl-SI', { month: 'long', year: 'numeric' });
+
+  generateTransactionsPdf(
+    res,
+    transactions.map(t => ({
+      ...t,
+      amount: Number(t.amount),
+      currency: t.currency.toString(),
+    })),
+    { ...user, currency: user.currency.toString() },
+    month
+  );
 }

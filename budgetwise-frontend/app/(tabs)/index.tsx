@@ -102,10 +102,10 @@ export default function HomeScreen() {
       Alert.alert('Napaka', 'Prosimo, izpolnite vsa polja.');
       return;
     }
-    if (transactionType === 'EXPENSE' && !categoryId) {
-      Alert.alert('Napaka', 'Prosimo, izberite kategorijo za strošek.');
-      return;
-    }
+ if (transactionType === 'EXPENSE' && !categoryId && (data?.categories?.length ?? 0) > 0) {
+  Alert.alert('Napaka', 'Prosimo, izberite kategorijo za strošek.');
+  return;
+}
     try {
       const todayStr = new Date().toISOString().split('T')[0];
       await transactionsApi.create({

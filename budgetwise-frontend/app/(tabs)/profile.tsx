@@ -13,6 +13,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { api } from '@/lib/api';
 import { Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
@@ -23,6 +25,7 @@ export default function ProfileScreen() {
   const [notifyWeekly, setNotifyWeekly] = useState(true);
   const [notifyGoal, setNotifyGoal] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const initials = [user?.firstName?.[0], user?.lastName?.[0]]
     .filter(Boolean).join('').toUpperCase() || user?.email?.[0]?.toUpperCase() || '?';
@@ -75,6 +78,36 @@ export default function ProfileScreen() {
       setUploading(false);
     }
   };
+
+const handleExportPdf = async () => {
+  setExportingPdf(true);
+  try {
+    const token = await import('@/lib/api').then(m => m.tokenStorage.getAccess());
+    const fileUri = FileSystem.documentDirectory + `transakcije-${new Date().getMonth() + 1}-${new Date().getFullYear()}.pdf`;
+
+    const result = await FileSystem.downloadAsync(
+      `${(await import('@/lib/api')).BASE_URL}/transactions/export/pdf`,
+      fileUri,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (result.status !== 200) throw new Error('Napaka pri prenosu');
+
+    await Sharing.shareAsync(result.uri, {
+      mimeType: 'application/pdf',
+      dialogTitle: 'Izvozi transakcije',
+    });
+  } catch (err) {
+    console.error('PDF export error:', err);
+    Alert.alert('Napaka', 'PDF ni bilo mogoče generirati.');
+  } finally {
+    setExportingPdf(false);
+  }
+};
 
   const styles = makeStyles(C);
 
@@ -160,6 +193,22 @@ export default function ProfileScreen() {
           <SwitchRow icon="flag-outline" label="Dosežen cilj" value={notifyGoal} onChange={setNotifyGoal} C={C} />
         </Section>
 
+        {/* ── Izvoz ── */}
+        <Section title="Izvoz podatkov" C={C}>
+          <TouchableOpacity style={styles.actionRow} onPress={handleExportPdf} disabled={exportingPdf}>
+            <View style={styles.actionLeft}>
+              <View style={styles.iconBox}>
+                <Ionicons name="document-text-outline" size={16} color={C.accent} />
+              </View>
+              <Text style={styles.actionText}>Izvozi transakcije (PDF)</Text>
+            </View>
+            {exportingPdf
+              ? <ActivityIndicator size="small" color={C.accent} />
+              : <Ionicons name="chevron-forward" size={16} color={C.text3} />
+            }
+          </TouchableOpacity>
+        </Section>
+
         {/* ── O aplikaciji ── */}
         <Section title="O aplikaciji" C={C}>
           <InfoRow icon="information-circle-outline" label="Verzija" value="1.0.0" C={C} />
@@ -174,16 +223,10 @@ export default function ProfileScreen() {
 
       </ScrollView>
 
-      <ChangePasswordModal
-        visible={showPasswordModal}
-        onClose={() => setShowPasswordModal(false)}
-        C={C}
-      />
+      <ChangePasswordModal visible={showPasswordModal} onClose={() => setShowPasswordModal(false)} C={C} />
     </SafeAreaView>
   );
 }
-
-// ─── Pomožne komponente ───────────────────────────────────────────────────────
 
 function Section({ title, children, C }: { title: string; children: React.ReactNode; C: any }) {
   const styles = makeStyles(C);
@@ -314,8 +357,6 @@ function PasswordInput({ label, value, onChange, show, onToggle, C }: {
     </View>
   );
 }
-
-// ─── Dynamic styles ───────────────────────────────────────────────────────────
 
 function makeStyles(C: any) {
   return StyleSheet.create({

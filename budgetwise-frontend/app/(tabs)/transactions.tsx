@@ -21,7 +21,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { api } from '@/lib/api';
 
-// ─── Static Data ──────────────────────────────────────────────────────────────
 const FILTERS = [
   "Vse", "Hrana", "Restavracije", "Kavarne", "Prevoz",
   "Zabava", "Zdravje", "Oblačila", "Sport", "Potovanje", "Ostalo",
@@ -32,7 +31,18 @@ const DEFAULT_COLLECTIONS = [
   "Zdravje", "Oblačila", "Sport", "Potovanje", "Ostalo",
 ];
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+const CATEGORY_MAP: Record<string, string> = {
+  'Hrana': 'Food & Dining',
+  'Restavracije': 'Food & Dining',
+  'Kavarne': 'Food & Dining',
+  'Prevoz': 'Transport',
+  'Zabava': 'Entertainment',
+  'Zdravje': 'Health',
+  'Oblačila': 'Shopping',
+  'Sport': 'Health',
+  'Potovanje': 'Transport',
+};
+
 interface InvoiceData {
   merchant: string;
   amount: string;
@@ -49,7 +59,6 @@ interface ParsedInvoice {
   category: string;
 }
 
-// ─── Receipt parsing ──────────────────────────────────────────────────────────
 async function parseReceiptViaBackend(base64Image: string): Promise<ParsedInvoice> {
   try {
     const response = await api.post("/ai-chat/parse-receipt",
@@ -70,7 +79,6 @@ async function parseReceiptViaBackend(base64Image: string): Promise<ParsedInvoic
   }
 }
 
-// ─── Filter Bar ───────────────────────────────────────────────────────────────
 function FilterBar({ active, setActive, C }: { active: string; setActive: (f: string) => void; C: any }) {
   return (
     <ScrollView
@@ -96,9 +104,21 @@ function FilterBar({ active, setActive, C }: { active: string; setActive: (f: st
   );
 }
 
-// ─── Transaction Card ─────────────────────────────────────────────────────────
-function TxCard({ tx, C }: { tx: any; C: any }) {
+// ─── Transaction Card z brisanjem in urejanjem ────────────────────────────────
+function TxCard({ tx, C, onDelete, onEdit }: { tx: any; C: any; onDelete: () => void; onEdit: () => void }) {
   const isExpense = tx.type === 'EXPENSE';
+
+  const confirmDelete = () => {
+    Alert.alert(
+      'Izbriši transakcijo',
+      `Ali res želiš izbrisati "${tx.description}"?`,
+      [
+        { text: 'Prekliči', style: 'cancel' },
+        { text: 'Izbriši', style: 'destructive', onPress: onDelete },
+      ]
+    );
+  };
+
   return (
     <View style={{
       backgroundColor: C.bg1, borderRadius: 12, padding: 12,
@@ -116,17 +136,103 @@ function TxCard({ tx, C }: { tx: any; C: any }) {
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 14, color: C.text1, fontWeight: "500" }}>{tx.description}</Text>
         <Text style={{ fontSize: 12, color: C.text3 }}>
-          {tx.category?.name ?? 'Nekategorizirano'} · {tx.date?.split('T')[0]}
+          {tx.type === 'INCOME' ? 'Prihodek' : (Object.entries(CATEGORY_MAP).find(([, eng]) => eng === tx.category?.name)?.[0] ?? tx.category?.name ?? 'Nekategorizirano')} · {tx.date?.split('T')[0]}
         </Text>
       </View>
       <Text style={{ fontSize: 14, fontWeight: "500", color: isExpense ? C.accent : C.warm }}>
         {isExpense ? '-' : '+'}€{parseFloat(tx.amount).toFixed(2)}
       </Text>
+      <TouchableOpacity onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Ionicons name="pencil-outline" size={18} color={C.text3} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={confirmDelete} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Ionicons name="trash-outline" size={18} color={C.accent} />
+      </TouchableOpacity>
     </View>
   );
 }
 
-// ─── Invoice Modal ────────────────────────────────────────────────────────────
+// ─── Edit Modal ───────────────────────────────────────────────────────────────
+function EditModal({ visible, tx, onClose, onSave, C }: any) {
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState('');
+
+  useEffect(() => {
+    if (visible && tx) {
+      setDescription(tx.description ?? '');
+      setAmount(String(parseFloat(tx.amount).toFixed(2)));
+      setCategory(tx.category?.name ?? '');
+    }
+  }, [visible, tx]);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.8)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: C.bg2, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
+
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 20 }}>
+              <Text style={{ color: C.text1, fontSize: 18, fontWeight: "600" }}>✏️ Uredi transakcijo</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close-circle" size={24} color={C.text3} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={{ fontSize: 11, color: C.text3, marginBottom: 4, textTransform: "uppercase" }}>Opis</Text>
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                placeholderTextColor={C.text3}
+                style={{ backgroundColor: C.inputBg, borderRadius: 10, padding: 12, color: C.text1, borderWidth: 0.5, borderColor: C.border2, marginBottom: 16 }}
+              />
+
+              <Text style={{ fontSize: 11, color: C.text3, marginBottom: 4, textTransform: "uppercase" }}>Znesek</Text>
+              <TextInput
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="decimal-pad"
+                placeholderTextColor={C.text3}
+                style={{ backgroundColor: C.inputBg, borderRadius: 10, padding: 12, color: C.text1, borderWidth: 0.5, borderColor: C.border2, marginBottom: 16 }}
+              />
+
+              <Text style={{ fontSize: 11, color: C.text3, marginBottom: 8, textTransform: "uppercase" }}>Kategorija</Text>
+              <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+                {["Hrana", "Restavracije", "Kavarne", "Prevoz", "Zabava", "Zdravje", "Oblačila", "Sport", "Potovanje", "Ostalo"].map((cat) => {
+                  const englishName = CATEGORY_MAP[cat] ?? cat;
+                  const isSelected = category === englishName;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      onPress={() => setCategory(englishName)}
+                      style={{
+                        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+                        backgroundColor: isSelected ? C.accent : C.inputBg,
+                        borderWidth: 0.5,
+                        borderColor: isSelected ? C.accent : C.border2,
+                      }}
+                    >
+                      <Text style={{ color: isSelected ? C.text1 : C.text3, fontSize: 13 }}>{cat}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => onSave({ description, amount, category })}
+              style={{ backgroundColor: C.accent, borderRadius: 12, padding: 14, alignItems: "center", marginTop: 4, marginBottom: Platform.OS === 'ios' ? 20 : 0 }}
+            >
+              <Text style={{ color: C.text1, fontWeight: "600", fontSize: 15 }}>💾 Shrani</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 function InvoiceFormModal({ visible, data, collections, onClose, onSave, C }: any) {
   const [form, setForm] = useState<InvoiceData>({
     merchant: "", amount: "", date: "", category: "Ostalo", note: "", collection: "Ostalo",
@@ -230,11 +336,15 @@ export default function TransactionsScreen() {
   const [scanning, setScanning] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
   const [parsedInvoice, setParsedInvoice] = useState<Partial<InvoiceData>>({});
+  const [editVisible, setEditVisible] = useState(false);
+  const [editingTx, setEditingTx] = useState<any>(null);
   const { isReady, isAuthenticated } = useAuth();
 
   const filterTx = () => {
-    if (active === "Vse") return transactions;
-    return transactions.filter((t) => t.collection === active || t.cat?.includes(active));
+    if (active === 'Vse') return transactions;
+    const englishName = CATEGORY_MAP[active];
+    if (!englishName) return transactions;
+    return transactions.filter((t) => t.category?.name === englishName);
   };
 
   const fetchTransactions = useCallback(async () => {
@@ -248,6 +358,38 @@ export default function TransactionsScreen() {
   }, [isReady, isAuthenticated]);
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
+
+  const handleDelete = async (id: string) => {
+    try {
+      await transactionsApi.delete(id);
+      await fetchTransactions();
+    } catch (err) {
+      Alert.alert('Napaka', 'Transakcije ni bilo mogoče izbrisati.');
+    }
+  };
+
+  const handleEdit = (tx: any) => {
+    setEditingTx(tx);
+    setEditVisible(true);
+  };
+
+const handleEditSave = async ({ description, amount, category }: { description: string; amount: string; category: string }) => {
+  try {
+    const amountNum = parseFloat(amount.replace(/[^0-9.]/g, '') || '0');
+    const allCategories = await categoriesApi.getAll();
+    const matched = allCategories.find((c: any) => c.name.toLowerCase() === category.toLowerCase());
+    await transactionsApi.update(editingTx.id, {
+      description,
+      amount: amountNum,
+      ...(matched && { categoryId: matched.id }),
+    });
+    setEditVisible(false);
+    setEditingTx(null);
+    await fetchTransactions();
+  } catch (err) {
+    Alert.alert('Napaka', 'Transakcije ni bilo mogoče posodobiti.');
+  }
+};
 
   const handleScan = async () => {
     const galleryPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -298,24 +440,25 @@ export default function TransactionsScreen() {
       const cleanAmount = String(data.amount).replace(/[^0-9.]/g, '');
       const amountNum = parseFloat(cleanAmount || '0');
       const allCategories = await categoriesApi.getAll();
-      const matched = allCategories.find((c: any) => c.name.toLowerCase() === data.category.toLowerCase());
+      const englishName = CATEGORY_MAP[data.category] ?? data.category;
+      const matched = allCategories.find((c: any) => c.name.toLowerCase() === englishName.toLowerCase());
       await transactionsApi.create({
-        type: 'EXPENSE', amount: amountNum,
+        type: 'EXPENSE',
+        amount: amountNum,
         description: data.merchant || 'Skeniran račun',
         date: data.date || new Date().toISOString().split('T')[0],
-        note: data.note,
         ...(matched && { categoryId: matched.id }),
       });
       await fetchTransactions();
       setFormVisible(false);
-    } catch (err) {
+    } catch (err: any) {
+      console.error('handleSave error:', JSON.stringify(err?.response?.data, null, 2));
       Alert.alert('Napaka', 'Transakcije ni bilo mogoče shraniti.');
     }
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg2 }}>
-      {/* Header */}
       <View style={{ backgroundColor: C.bg1, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: C.border1 }}>
         <Text style={{ fontSize: 18, fontWeight: "500", color: C.text1 }}>Transakcije</Text>
         <Text style={{ fontSize: 13, color: C.text3, marginTop: 2 }}>
@@ -326,7 +469,6 @@ export default function TransactionsScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <FilterBar active={active} setActive={setActive} C={C} />
 
-        {/* Scan Button */}
         <TouchableOpacity
           onPress={handleScan}
           disabled={scanning}
@@ -345,9 +487,16 @@ export default function TransactionsScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Transactions */}
         <View style={{ paddingHorizontal: 16, gap: 8 }}>
-          {filterTx().map((tx) => <TxCard key={tx.id} tx={tx} C={C} />)}
+          {filterTx().map((tx) => (
+            <TxCard
+              key={tx.id}
+              tx={tx}
+              C={C}
+              onDelete={() => handleDelete(tx.id)}
+              onEdit={() => handleEdit(tx)}
+            />
+          ))}
         </View>
 
         <View style={{ height: 30 }} />
@@ -359,6 +508,14 @@ export default function TransactionsScreen() {
         collections={collections}
         onClose={() => setFormVisible(false)}
         onSave={handleSave}
+        C={C}
+      />
+
+      <EditModal
+        visible={editVisible}
+        tx={editingTx}
+        onClose={() => { setEditVisible(false); setEditingTx(null); }}
+        onSave={handleEditSave}
         C={C}
       />
     </SafeAreaView>
