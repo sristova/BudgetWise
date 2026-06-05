@@ -126,53 +126,75 @@ export async function getDashboardSummary(req: Request, res: Response) {
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-  const [
-    currentMonthStats,
-    lastMonthStats,
-    recentTransactions,
-    topCategories,
-    goals,
-    categories,
-  ] = await Promise.all([
-    prisma.transaction.groupBy({
-      by: ['type'],
-      where: { userId, date: { gte: startOfMonth, lte: endOfMonth } },
-      _sum: { amount: true },
-      _count: true,
-    }),
-    prisma.transaction.groupBy({
-      by: ['type'],
-      where: { userId, date: { gte: startOfLastMonth, lte: endOfLastMonth } },
-      _sum: { amount: true },
-    }),
-    prisma.transaction.findMany({
-      where: { userId },
-      orderBy: { date: 'desc' },
-      take: 5,
-      include: { category: { select: { name: true, icon: true, color: true } } },
-    }),
-    prisma.transaction.groupBy({
-      by: ['categoryId'],
-      where: { userId, type: 'EXPENSE', date: { gte: startOfMonth, lte: endOfMonth } },
-      _sum: { amount: true },
-      orderBy: { _sum: { amount: 'desc' } },
-      take: 5,
-    }),
-    prisma.goal.findMany({
-      where: { userId, status: 'ACTIVE' },
-      orderBy: { deadline: 'asc' },
-      take: 3,
-    }),
-    prisma.category.findMany({
-      where: { userId },
-      orderBy: { name: 'asc' },
-    }),
-  ]);
+  const startOfWeek = new Date(now);
+startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7)); // Ponedeljek
+startOfWeek.setHours(0, 0, 0, 0);
+
+const [
+  currentMonthStats,
+  lastMonthStats,
+  recentTransactions,
+  topCategories,
+  goals,
+  categories,
+  weeklyTransactions,  
+] = await Promise.all([
+  prisma.transaction.groupBy({
+    by: ['type'],
+    where: { userId, date: { gte: startOfMonth, lte: endOfMonth } },
+    _sum: { amount: true },
+    _count: true,
+  }),
+  prisma.transaction.groupBy({
+    by: ['type'],
+    where: { userId, date: { gte: startOfLastMonth, lte: endOfLastMonth } },
+    _sum: { amount: true },
+  }),
+  prisma.transaction.findMany({
+    where: { userId },
+    orderBy: { date: 'desc' },
+    take: 5,
+    include: { category: { select: { name: true, icon: true, color: true } } },
+  }),
+  prisma.transaction.groupBy({
+    by: ['categoryId'],
+    where: { userId, type: 'EXPENSE', date: { gte: startOfMonth, lte: endOfMonth } },
+    _sum: { amount: true },
+    orderBy: { _sum: { amount: 'desc' } },
+    take: 5,
+  }),
+  prisma.goal.findMany({
+    where: { userId, status: 'ACTIVE' },
+    orderBy: { deadline: 'asc' },
+    take: 3,
+  }),
+  prisma.category.findMany({
+    where: { userId },
+    orderBy: { name: 'asc' },
+  }),
+  prisma.transaction.findMany({
+    where: {
+      userId,
+      type: 'EXPENSE',
+      date: { gte: startOfWeek },
+    },
+    select: { amount: true, date: true },
+  }),
+]);
 
   const income = currentMonthStats.find(s => s.type === 'INCOME')?._sum.amount ?? 0;
   const expenses = currentMonthStats.find(s => s.type === 'EXPENSE')?._sum.amount ?? 0;
   const lastIncome = lastMonthStats.find(s => s.type === 'INCOME')?._sum.amount ?? 0;
   const lastExpenses = lastMonthStats.find(s => s.type === 'EXPENSE')?._sum.amount ?? 0;
+
+  // Izračunaj porabo po dnevih: [Pon, Tor, Sre, Čet, Pet, Sob, Ned]
+const weeklySpending = [0, 0, 0, 0, 0, 0, 0];
+for (const tx of weeklyTransactions) {
+  const txDate = new Date(tx.date);
+  // getDay(): 0=Ned, 1=Pon ... 6=Sob → pretvorimo v 0=Pon ... 6=Ned
+  const dayIndex = (txDate.getDay() + 6) % 7;
+  weeklySpending[dayIndex] += Number(tx.amount);
+}
 
   return success(res, {
     currentMonth: {
@@ -182,6 +204,7 @@ export async function getDashboardSummary(req: Request, res: Response) {
       incomeChange: lastIncome ? ((Number(income) - Number(lastIncome)) / Number(lastIncome)) * 100 : 0,
       expensesChange: lastExpenses ? ((Number(expenses) - Number(lastExpenses)) / Number(lastExpenses)) * 100 : 0,
     },
+    weeklySpending,
     recentTransactions,
     topCategories,
     goals,

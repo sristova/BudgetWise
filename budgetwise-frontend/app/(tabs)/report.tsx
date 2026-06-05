@@ -279,7 +279,7 @@ export default function StatisticsScreen() {
         <Animated.View style={[styles.content, contentStyle]}>
           {/* 2x2 Grid */}
           <View style={styles.grid}>
-            <StatCard label="Prihodki" value={formatCurrency(stats?.currentMonth.income ?? 0)} valueColor={C.warm} icon="💚" change={stats?.changes.income} delay={0} style={styles.halfCard} />
+            <StatCard label="Prihodki" value={formatCurrency(stats?.currentMonth.income ?? 0)} valueColor={C.warm} icon="💰" change={stats?.changes.income} delay={0} style={styles.halfCard} />
             <StatCard label="Stroški" value={formatCurrency(stats?.currentMonth.expenses ?? 0)} valueColor={C.accent} icon="📤" change={stats?.changes.expenses} changeInverted delay={60} style={styles.halfCard} />
             <StatCard
               label="Prihranki"
