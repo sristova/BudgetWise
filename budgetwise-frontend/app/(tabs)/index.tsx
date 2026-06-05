@@ -23,6 +23,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { transactionsApi } from '@/lib/api';
 
+// Uvozimo getCategoryLabel iz transactions.tsx da je logika na enem mestu
+import { getCategoryLabel } from './transactions';
+
 const { width } = Dimensions.get('window');
 
 const DAYS = ['Pon', 'Tor', 'Sre', 'Čet', 'Pet', 'Sob', 'Ned'];
@@ -45,6 +48,7 @@ interface DashboardData {
     name: string;
     icon: string;
     color: string;
+    type: string;
   }>;
 }
 
@@ -97,15 +101,23 @@ export default function HomeScreen() {
     load(true);
   }, [load]);
 
+  const openModal = (type: 'INCOME' | 'EXPENSE') => {
+    setTransactionType(type);
+    setCategoryId(undefined);
+    setDescription('');
+    setAmount('');
+    setModalVisible(true);
+  };
+
   const handleCreateTransaction = async () => {
     if (!amount || !description) {
       Alert.alert('Napaka', 'Prosimo, izpolnite vsa polja.');
       return;
     }
- if (transactionType === 'EXPENSE' && !categoryId && (data?.categories?.length ?? 0) > 0) {
-  Alert.alert('Napaka', 'Prosimo, izberite kategorijo za strošek.');
-  return;
-}
+    if (transactionType === 'EXPENSE' && !categoryId && (data?.categories?.filter(c => c.type === 'EXPENSE').length ?? 0) > 0) {
+      Alert.alert('Napaka', 'Prosimo, izberite kategorijo za strošek.');
+      return;
+    }
     try {
       const todayStr = new Date().toISOString().split('T')[0];
       await transactionsApi.create({
@@ -129,7 +141,11 @@ export default function HomeScreen() {
   const bars: number[] = data?.weeklySpending ?? [0, 0, 0, 0, 0, 0, 0];
   const barMax = Math.max(...bars, 1);
 
-  // Dinamični stili glede na temo
+  // Filtriraj kategorije po tipu za modal
+  const expenseCategories = (data?.categories ?? []).filter(c => c.type === 'EXPENSE');
+  const incomeCategories = (data?.categories ?? []).filter(c => c.type === 'INCOME');
+  const modalCategories = transactionType === 'EXPENSE' ? expenseCategories : incomeCategories;
+
   const s = makeStyles(C);
 
   return (
@@ -185,10 +201,7 @@ export default function HomeScreen() {
               <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
                 {/* Prihodki */}
                 <TouchableOpacity
-                  onPress={() => {
-                    setTransactionType('INCOME');
-                    setModalVisible(true);
-                  }}
+                  onPress={() => openModal('INCOME')}
                   style={{ flex: 1, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: C.border2 }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -205,10 +218,7 @@ export default function HomeScreen() {
 
                 {/* Stroški */}
                 <TouchableOpacity
-                  onPress={() => {
-                    setTransactionType('EXPENSE');
-                    setModalVisible(true);
-                  }}
+                  onPress={() => openModal('EXPENSE')}
                   style={{ flex: 1, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: C.border2 }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -230,14 +240,14 @@ export default function HomeScreen() {
               <Text style={{ fontSize: 11, color: C.text3, letterSpacing: 0.08, marginBottom: 10, textTransform: 'uppercase' }}>HITER DOSTOP</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
                 {[
-                  { label: 'Dodaj strošek', icon: 'add-circle-outline' as const, screen: '/transactions' },
-                  { label: 'Skeniraj račun', icon: 'camera-outline' as const, screen: '/transactions' },
-                  { label: 'Cilji', icon: 'flag-outline' as const, screen: '/goals' },
-                  { label: 'AI asistent', icon: 'chatbubble-ellipses-outline' as const, screen: '/assistant' },
+                  { label: 'Dodaj strošek', icon: 'add-circle-outline' as const, action: () => openModal('EXPENSE') },
+                  { label: 'Skeniraj račun', icon: 'camera-outline' as const, action: () => router.push('/transactions' as any) },
+                  { label: 'Cilji', icon: 'flag-outline' as const, action: () => router.push('/goals' as any) },
+                  { label: 'AI asistent', icon: 'chatbubble-ellipses-outline' as const, action: () => router.push('/assistant' as any) },
                 ].map((a) => (
                   <TouchableOpacity
                     key={a.label}
-                    onPress={() => router.push(a.screen as any)}
+                    onPress={a.action}
                     style={{ width: (width - 42) / 2, backgroundColor: C.bg1, borderWidth: 0.5, borderColor: C.border2, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}
                   >
                     <Ionicons name={a.icon} size={20} color={C.accent} />
@@ -280,13 +290,19 @@ export default function HomeScreen() {
                   data?.recentTransactions.map((tx) => (
                     <View key={tx.id} style={{ backgroundColor: C.bg1, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 0.5, borderColor: C.border1 }}>
                       <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: tx.type === 'INCOME' ? C.success : C.deep, alignItems: 'center', justifyContent: 'center' }}>
+                        {/* Emoji: ikona iz kategorije, sicer nevtralni emoji */}
                         <Text style={{ fontSize: 18 }}>{tx.category?.icon ?? (tx.type === 'INCOME' ? '💰' : '💸')}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 14, color: C.text1, fontWeight: '500' }}>{tx.description}</Text>
-                        <Text style={{ fontSize: 12, color: C.text3 }}>{tx.category?.name ?? (tx.type === 'INCOME' ? 'Prihodek' : 'Strošek')}</Text>
+                        <Text style={{ fontSize: 12, color: C.text3 }}>
+                          {tx.type === 'INCOME'
+                            ? 'Prihodek'
+                            : getCategoryLabel(tx.category?.name)
+                          }
+                        </Text>
                       </View>
-                      <Text style={{ fontSize: 14, fontWeight: '500', color: tx.type === 'EXPENSE' ? C.accent : C.green }}>
+                      <Text style={{ fontSize: 14, fontWeight: '500', color: tx.type === 'EXPENSE' ? C.accent : C.warm }}>
                         {tx.type === 'EXPENSE' ? '-' : '+'}{formatCurrency(tx.amount, user?.currency)}
                       </Text>
                     </View>
@@ -299,7 +315,7 @@ export default function HomeScreen() {
         <View style={{ height: 24 }} />
       </ScrollView>
 
-      {/* ─── Modal za dodajanje ─── */}
+      {/* ─── Modal za dodajanje transakcije ─── */}
       <Modal visible={modalVisible} animationType="slide" transparent={true} onRequestClose={() => setModalVisible(false)}>
         <View style={s.sheetOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.sheetContainer}>
@@ -307,58 +323,63 @@ export default function HomeScreen() {
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <Text style={s.sheetTitle}>
-                {transactionType === 'INCOME' ? 'Dodaj prihodek' : 'Dodaj strošek'}
+                {transactionType === 'INCOME' ? '💰 Dodaj prihodek' : '💸 Dodaj strošek'}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close-circle" size={24} color={C.text3} />
               </TouchableOpacity>
             </View>
 
-            <Text style={s.label}>Znesek</Text>
-            <TextInput
-              style={s.input}
-              placeholder="0.00"
-              placeholderTextColor={C.text3}
-              keyboardType="decimal-pad"
-              value={amount}
-              onChangeText={setAmount}
-            />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={s.label}>Znesek</Text>
+              <TextInput
+                style={s.input}
+                placeholder="0.00"
+                placeholderTextColor={C.text3}
+                keyboardType="decimal-pad"
+                value={amount}
+                onChangeText={setAmount}
+              />
 
-            <Text style={s.label}>Opis transakcije</Text>
-            <TextInput
-              style={s.input}
-              placeholder={transactionType === 'INCOME' ? 'Plača, Božičnica, Prodaja...' : 'Trgovina, Kosilo, Bencin...'}
-              placeholderTextColor={C.text3}
-              value={description}
-              onChangeText={setDescription}
-            />
+              <Text style={s.label}>Opis transakcije</Text>
+              <TextInput
+                style={s.input}
+                placeholder={transactionType === 'INCOME' ? 'Plača, Božičnica, Prodaja...' : 'Trgovina, Kosilo, Bencin...'}
+                placeholderTextColor={C.text3}
+                value={description}
+                onChangeText={setDescription}
+              />
 
-            {transactionType === 'EXPENSE' && data?.categories && (
-              <View style={{ marginBottom: 16 }}>
-                <Text style={s.label}>Kategorija</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
-                  {data.categories.map((cat) => {
-                    const isSelected = categoryId === cat.id;
-                    return (
-                      <TouchableOpacity
-                        key={cat.id}
-                        onPress={() => setCategoryId(cat.id)}
-                        style={[s.categoryBadge, isSelected && { backgroundColor: C.accent, borderColor: C.accent }]}
-                      >
-                        <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
-                        <Text style={{ color: isSelected ? C.text1 : C.text2, fontSize: 12, fontWeight: '500' }}>
-                          {cat.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
+              {/* Kategorije — fetchane iz DB, prevedene v slovenščino */}
+              {modalCategories.length > 0 && (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={s.label}>Kategorija</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                    {modalCategories.map((cat) => {
+                      const isSelected = categoryId === cat.id;
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          onPress={() => setCategoryId(cat.id)}
+                          style={[s.categoryBadge, isSelected && { backgroundColor: C.accent, borderColor: C.accent }]}
+                        >
+                          <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
+                          <Text style={{ color: isSelected ? C.text1 : C.text2, fontSize: 12, fontWeight: '500' }}>
+                            {getCategoryLabel(cat.name)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
 
-            <TouchableOpacity onPress={handleCreateTransaction} style={s.submitBtn}>
-              <Text style={{ color: C.text1, fontSize: 15, fontWeight: '600' }}>Shrani transakcijo</Text>
-            </TouchableOpacity>
+              <TouchableOpacity onPress={handleCreateTransaction} style={s.submitBtn}>
+                <Text style={{ color: C.text1, fontSize: 15, fontWeight: '600' }}>Shrani transakcijo</Text>
+              </TouchableOpacity>
+
+              <View style={{ height: Platform.OS === 'ios' ? 20 : 0 }} />
+            </ScrollView>
           </KeyboardAvoidingView>
         </View>
       </Modal>
@@ -429,7 +450,6 @@ function makeStyles(C: any) {
       padding: 14,
       alignItems: 'center',
       marginTop: 12,
-      marginBottom: Platform.OS === 'ios' ? 20 : 0,
     },
   });
 }

@@ -21,27 +21,47 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { api } from '@/lib/api';
 
-const FILTERS = [
-  "Vse", "Hrana", "Restavracije", "Kavarne", "Prevoz",
-  "Zabava", "Zdravje", "Oblačila", "Sport", "Potovanje", "Ostalo",
-];
-
-const DEFAULT_COLLECTIONS = [
-  "Hrana", "Restavracije", "Kavarne", "Prevoz", "Zabava",
-  "Zdravje", "Oblačila", "Sport", "Potovanje", "Ostalo",
-];
-
-const CATEGORY_MAP: Record<string, string> = {
-  'Hrana': 'Food & Dining',
-  'Restavracije': 'Food & Dining',
-  'Kavarne': 'Food & Dining',
-  'Prevoz': 'Transport',
-  'Zabava': 'Entertainment',
-  'Zdravje': 'Health',
-  'Oblačila': 'Shopping',
-  'Sport': 'Health',
-  'Potovanje': 'Transport',
+// ─── Prevodni slovar: DB ime → slovensko ime za prikaz ────────────────────────
+// Pokriva vse možne vrednosti ki so lahko v bazi (angleške stare + slovenske nove)
+export const CATEGORY_DISPLAY: Record<string, string> = {
+  // Angleške (stare — za obstoječe uporabnike)
+  'Food & Dining':  'Hrana in pijača',
+  'Transport':      'Prevoz',
+  'Entertainment':  'Zabava',
+  'Health':         'Zdravje',
+  'Shopping':       'Nakupovanje',
+  'Housing':        'Stanovanje',
+  'Education':      'Izobraževanje',
+  'Salary':         'Plača',
+  'Investment':     'Investicije',
+  'Freelance':      'Freelance',
+  'Other':          'Ostalo',
+  // Slovenske (nove)
+  'Hrana in pijača':       'Hrana in pijača',
+  'Restavracije':          'Restavracije',
+  'Kavarne':               'Kavarne',
+  'Transport in avto':     'Prevoz',
+  'Nakupovanje':           'Nakupovanje',
+  'Stanovanje in stroški': 'Stanovanje',
+  'Zabava in prosti čas':  'Zabava',
+  'Zdravje in oskrba':     'Zdravje',
+  'Sport in fitnes':       'Šport',
+  'Izobraževanje':         'Izobraževanje',
+  'Potovanje':             'Potovanje',
+  'Ostalo':                'Ostalo',
+  'Plača':                 'Plača',
+  'Dodatni zaslužek':      'Dodatni zaslužek',
+  'Investicije':           'Investicije',
+  // Morebitne variante
+  'Hrana':  'Hrana',
+  'Prevoz': 'Prevoz',
 };
+
+// Pridobi slovensko ime za prikaz, z fallback na originalno ime
+export function getCategoryLabel(dbName: string | undefined): string {
+  if (!dbName) return 'Nekategorizirano';
+  return CATEGORY_DISPLAY[dbName] ?? dbName;
+}
 
 interface InvoiceData {
   merchant: string;
@@ -49,7 +69,6 @@ interface InvoiceData {
   date: string;
   category: string;
   note: string;
-  collection: string;
 }
 
 interface ParsedInvoice {
@@ -79,32 +98,65 @@ async function parseReceiptViaBackend(base64Image: string): Promise<ParsedInvoic
   }
 }
 
-function FilterBar({ active, setActive, C }: { active: string; setActive: (f: string) => void; C: any }) {
+// ─── Filter Bar ───────────────────────────────────────────────────────────────
+// Filtri se gradijo dinamično iz DB kategorij — ne statično
+function FilterBar({
+  active,
+  setActive,
+  C,
+  dbCategories,
+}: {
+  active: string;
+  setActive: (f: string) => void;
+  C: any;
+  dbCategories: Array<{ id: string; name: string; type: string }>;
+}) {
+  // Samo EXPENSE kategorije za filter + "Vse"
+  const expenseCategories = dbCategories.filter(c => c.type === 'EXPENSE');
+
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexDirection: "row" }}
     >
-      {FILTERS.map((f) => (
-        <TouchableOpacity
-          key={f}
-          onPress={() => setActive(f)}
-          style={{
-            paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
-            borderWidth: 0.5,
-            borderColor: active === f ? C.accent : C.border2,
-            backgroundColor: active === f ? C.accent : C.bg1,
-          }}
-        >
-          <Text style={{ fontSize: 12, color: active === f ? C.text1 : C.text3 }}>{f}</Text>
-        </TouchableOpacity>
-      ))}
+      {/* "Vse" filter */}
+      <TouchableOpacity
+        onPress={() => setActive('Vse')}
+        style={{
+          paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
+          borderWidth: 0.5,
+          borderColor: active === 'Vse' ? C.accent : C.border2,
+          backgroundColor: active === 'Vse' ? C.accent : C.bg1,
+        }}
+      >
+        <Text style={{ fontSize: 12, color: active === 'Vse' ? C.text1 : C.text3 }}>Vse</Text>
+      </TouchableOpacity>
+
+      {/* Dinamični filtri iz DB */}
+      {expenseCategories.map((cat) => {
+        const label = getCategoryLabel(cat.name);
+        const isActive = active === cat.name;
+        return (
+          <TouchableOpacity
+            key={cat.id}
+            onPress={() => setActive(cat.name)}
+            style={{
+              paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
+              borderWidth: 0.5,
+              borderColor: isActive ? C.accent : C.border2,
+              backgroundColor: isActive ? C.accent : C.bg1,
+            }}
+          >
+            <Text style={{ fontSize: 12, color: isActive ? C.text1 : C.text3 }}>{label}</Text>
+          </TouchableOpacity>
+        );
+      })}
     </ScrollView>
   );
 }
 
-// ─── Transaction Card z brisanjem in urejanjem ────────────────────────────────
+// ─── Transaction Card ─────────────────────────────────────────────────────────
 function TxCard({ tx, C, onDelete, onEdit }: { tx: any; C: any; onDelete: () => void; onEdit: () => void }) {
   const isExpense = tx.type === 'EXPENSE';
 
@@ -130,13 +182,16 @@ function TxCard({ tx, C, onDelete, onEdit }: { tx: any; C: any; onDelete: () => 
         alignItems: "center", justifyContent: "center",
       }}>
         <Text style={{ fontSize: 18 }}>
-          {tx.category?.icon ?? (isExpense ? '💸' : '💚')}
+          {tx.category?.icon ?? (isExpense ? '💸' : '💰')}
         </Text>
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 14, color: C.text1, fontWeight: "500" }}>{tx.description}</Text>
         <Text style={{ fontSize: 12, color: C.text3 }}>
-          {tx.type === 'INCOME' ? 'Prihodek' : (Object.entries(CATEGORY_MAP).find(([, eng]) => eng === tx.category?.name)?.[0] ?? tx.category?.name ?? 'Nekategorizirano')} · {tx.date?.split('T')[0]}
+          {tx.type === 'INCOME'
+            ? 'Prihodek'
+            : getCategoryLabel(tx.category?.name)
+          } · {tx.date?.split('T')[0]}
         </Text>
       </View>
       <Text style={{ fontSize: 14, fontWeight: "500", color: isExpense ? C.accent : C.warm }}>
@@ -153,18 +208,20 @@ function TxCard({ tx, C, onDelete, onEdit }: { tx: any; C: any; onDelete: () => 
 }
 
 // ─── Edit Modal ───────────────────────────────────────────────────────────────
-function EditModal({ visible, tx, onClose, onSave, C }: any) {
+function EditModal({ visible, tx, onClose, onSave, C, dbCategories }: any) {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('');
+  const [categoryId, setCategoryId] = useState<string>('');
 
   useEffect(() => {
     if (visible && tx) {
       setDescription(tx.description ?? '');
       setAmount(String(parseFloat(tx.amount).toFixed(2)));
-      setCategory(tx.category?.name ?? '');
+      setCategoryId(tx.category?.id ?? '');
     }
   }, [visible, tx]);
+
+  const expenseCategories = dbCategories.filter((c: any) => c.type === 'EXPENSE');
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -199,13 +256,12 @@ function EditModal({ visible, tx, onClose, onSave, C }: any) {
 
               <Text style={{ fontSize: 11, color: C.text3, marginBottom: 8, textTransform: "uppercase" }}>Kategorija</Text>
               <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-                {["Hrana", "Restavracije", "Kavarne", "Prevoz", "Zabava", "Zdravje", "Oblačila", "Sport", "Potovanje", "Ostalo"].map((cat) => {
-                  const englishName = CATEGORY_MAP[cat] ?? cat;
-                  const isSelected = category === englishName;
+                {expenseCategories.map((cat: any) => {
+                  const isSelected = categoryId === cat.id;
                   return (
                     <TouchableOpacity
-                      key={cat}
-                      onPress={() => setCategory(englishName)}
+                      key={cat.id}
+                      onPress={() => setCategoryId(cat.id)}
                       style={{
                         paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
                         backgroundColor: isSelected ? C.accent : C.inputBg,
@@ -213,7 +269,9 @@ function EditModal({ visible, tx, onClose, onSave, C }: any) {
                         borderColor: isSelected ? C.accent : C.border2,
                       }}
                     >
-                      <Text style={{ color: isSelected ? C.text1 : C.text3, fontSize: 13 }}>{cat}</Text>
+                      <Text style={{ color: isSelected ? C.text1 : C.text3, fontSize: 13 }}>
+                        {cat.icon} {getCategoryLabel(cat.name)}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -221,7 +279,7 @@ function EditModal({ visible, tx, onClose, onSave, C }: any) {
             </ScrollView>
 
             <TouchableOpacity
-              onPress={() => onSave({ description, amount, category })}
+              onPress={() => onSave({ description, amount, categoryId })}
               style={{ backgroundColor: C.accent, borderRadius: 12, padding: 14, alignItems: "center", marginTop: 4, marginBottom: Platform.OS === 'ios' ? 20 : 0 }}
             >
               <Text style={{ color: C.text1, fontWeight: "600", fontSize: 15 }}>💾 Shrani</Text>
@@ -233,20 +291,28 @@ function EditModal({ visible, tx, onClose, onSave, C }: any) {
   );
 }
 
-function InvoiceFormModal({ visible, data, collections, onClose, onSave, C }: any) {
+// ─── Invoice Form Modal ───────────────────────────────────────────────────────
+function InvoiceFormModal({ visible, data, onClose, onSave, C, dbCategories }: any) {
   const [form, setForm] = useState<InvoiceData>({
-    merchant: "", amount: "", date: "", category: "Ostalo", note: "", collection: "Ostalo",
+    merchant: "", amount: "", date: "", category: "", note: "",
   });
 
+  const expenseCategories = dbCategories.filter((c: any) => c.type === 'EXPENSE');
+
   useEffect(() => {
-    if (visible) {
+    if (visible && expenseCategories.length > 0) {
+      // Poskusi najti kategorijo ki jo je vrnil AI (po imenu)
+      const aiCategoryName = data.category ?? '';
+      const matched = expenseCategories.find((c: any) =>
+        c.name.toLowerCase() === aiCategoryName.toLowerCase() ||
+        getCategoryLabel(c.name).toLowerCase() === aiCategoryName.toLowerCase()
+      );
       setForm({
         merchant: data.merchant ?? "",
         amount: data.amount ?? "",
         date: data.date ?? "",
-        category: data.category ?? "Ostalo",
+        category: matched?.id ?? expenseCategories[0]?.id ?? "",
         note: "",
-        collection: data.category ?? "Ostalo",
       });
     }
   }, [visible, data]);
@@ -292,22 +358,25 @@ function InvoiceFormModal({ visible, data, collections, onClose, onSave, C }: an
                   Kategorija
                 </Text>
                 <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-                  {["Hrana", "Restavracije", "Kavarne", "Prevoz", "Zabava", "Zdravje", "Oblačila", "Sport", "Potovanje", "Ostalo"].map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      onPress={() => setForm((f) => ({ ...f, category: cat }))}
-                      style={{
-                        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
-                        backgroundColor: form.category === cat ? C.accent : C.inputBg,
-                        borderWidth: 0.5,
-                        borderColor: form.category === cat ? C.accent : C.border2,
-                      }}
-                    >
-                      <Text style={{ color: form.category === cat ? C.text1 : C.text3, fontSize: 13 }}>
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {expenseCategories.map((cat: any) => {
+                    const isSelected = form.category === cat.id;
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        onPress={() => setForm((f) => ({ ...f, category: cat.id }))}
+                        style={{
+                          paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+                          backgroundColor: isSelected ? C.accent : C.inputBg,
+                          borderWidth: 0.5,
+                          borderColor: isSelected ? C.accent : C.border2,
+                        }}
+                      >
+                        <Text style={{ color: isSelected ? C.text1 : C.text3, fontSize: 13 }}>
+                          {cat.icon} {getCategoryLabel(cat.name)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
 
@@ -332,7 +401,7 @@ export default function TransactionsScreen() {
   const { colors: C } = useTheme();
   const [active, setActive] = useState("Vse");
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [collections] = useState(DEFAULT_COLLECTIONS);
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [scanning, setScanning] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
   const [parsedInvoice, setParsedInvoice] = useState<Partial<InvoiceData>>({});
@@ -340,12 +409,21 @@ export default function TransactionsScreen() {
   const [editingTx, setEditingTx] = useState<any>(null);
   const { isReady, isAuthenticated } = useAuth();
 
+  // Filter po točnem category.name iz DB (string primerjava, brez mape)
   const filterTx = () => {
     if (active === 'Vse') return transactions;
-    const englishName = CATEGORY_MAP[active];
-    if (!englishName) return transactions;
-    return transactions.filter((t) => t.category?.name === englishName);
+    return transactions.filter((t) => t.category?.name === active);
   };
+
+  const fetchCategories = useCallback(async () => {
+    if (!isReady || !isAuthenticated) return;
+    try {
+      const cats = await categoriesApi.getAll();
+      setDbCategories(cats ?? []);
+    } catch (err) {
+      console.error('Napaka pri nalaganju kategorij:', err);
+    }
+  }, [isReady, isAuthenticated]);
 
   const fetchTransactions = useCallback(async () => {
     if (!isReady || !isAuthenticated) return;
@@ -357,7 +435,10 @@ export default function TransactionsScreen() {
     }
   }, [isReady, isAuthenticated]);
 
-  useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
+  useEffect(() => {
+    fetchCategories();
+    fetchTransactions();
+  }, [fetchCategories, fetchTransactions]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -373,23 +454,25 @@ export default function TransactionsScreen() {
     setEditVisible(true);
   };
 
-const handleEditSave = async ({ description, amount, category }: { description: string; amount: string; category: string }) => {
-  try {
-    const amountNum = parseFloat(amount.replace(/[^0-9.]/g, '') || '0');
-    const allCategories = await categoriesApi.getAll();
-    const matched = allCategories.find((c: any) => c.name.toLowerCase() === category.toLowerCase());
-    await transactionsApi.update(editingTx.id, {
-      description,
-      amount: amountNum,
-      ...(matched && { categoryId: matched.id }),
-    });
-    setEditVisible(false);
-    setEditingTx(null);
-    await fetchTransactions();
-  } catch (err) {
-    Alert.alert('Napaka', 'Transakcije ni bilo mogoče posodobiti.');
-  }
-};
+  const handleEditSave = async ({ description, amount, categoryId }: {
+    description: string;
+    amount: string;
+    categoryId: string;
+  }) => {
+    try {
+      const amountNum = parseFloat(amount.replace(/[^0-9.]/g, '') || '0');
+      await transactionsApi.update(editingTx.id, {
+        description,
+        amount: amountNum,
+        ...(categoryId && { categoryId }),
+      });
+      setEditVisible(false);
+      setEditingTx(null);
+      await fetchTransactions();
+    } catch (err) {
+      Alert.alert('Napaka', 'Transakcije ni bilo mogoče posodobiti.');
+    }
+  };
 
   const handleScan = async () => {
     const galleryPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -426,7 +509,13 @@ const handleEditSave = async ({ description, amount, category }: { description: 
       );
       if (!manipulated.base64) throw new Error('Kompresija slike ni uspela');
       const parsed = await parseReceiptViaBackend(manipulated.base64);
-      setParsedInvoice({ merchant: parsed.merchant, amount: parsed.amount, date: parsed.date, category: parsed.category, note: '', collection: parsed.category });
+      setParsedInvoice({
+        merchant: parsed.merchant,
+        amount: parsed.amount,
+        date: parsed.date,
+        category: parsed.category,
+        note: '',
+      });
       setFormVisible(true);
     } catch (e: any) {
       Alert.alert('Napaka', e?.message ?? 'Računa ni bilo mogoče analizirati.');
@@ -435,19 +524,18 @@ const handleEditSave = async ({ description, amount, category }: { description: 
     }
   };
 
+  // categoryId je zdaj direktno ID iz DB (ne ime)
   const handleSave = async (data: InvoiceData) => {
     try {
       const cleanAmount = String(data.amount).replace(/[^0-9.]/g, '');
       const amountNum = parseFloat(cleanAmount || '0');
-      const allCategories = await categoriesApi.getAll();
-      const englishName = CATEGORY_MAP[data.category] ?? data.category;
-      const matched = allCategories.find((c: any) => c.name.toLowerCase() === englishName.toLowerCase());
+
       await transactionsApi.create({
         type: 'EXPENSE',
         amount: amountNum,
         description: data.merchant || 'Skeniran račun',
         date: data.date || new Date().toISOString().split('T')[0],
-        ...(matched && { categoryId: matched.id }),
+        ...(data.category && { categoryId: data.category }),
       });
       await fetchTransactions();
       setFormVisible(false);
@@ -467,7 +555,12 @@ const handleEditSave = async ({ description, amount, category }: { description: 
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        <FilterBar active={active} setActive={setActive} C={C} />
+        <FilterBar
+          active={active}
+          setActive={setActive}
+          C={C}
+          dbCategories={dbCategories}
+        />
 
         <TouchableOpacity
           onPress={handleScan}
@@ -497,6 +590,11 @@ const handleEditSave = async ({ description, amount, category }: { description: 
               onEdit={() => handleEdit(tx)}
             />
           ))}
+          {filterTx().length === 0 && (
+            <View style={{ backgroundColor: C.bg1, borderRadius: 12, padding: 20, alignItems: 'center', borderWidth: 0.5, borderColor: C.border1 }}>
+              <Text style={{ color: C.text3, fontSize: 13 }}>Ni transakcij v tej kategoriji.</Text>
+            </View>
+          )}
         </View>
 
         <View style={{ height: 30 }} />
@@ -505,10 +603,10 @@ const handleEditSave = async ({ description, amount, category }: { description: 
       <InvoiceFormModal
         visible={formVisible}
         data={parsedInvoice}
-        collections={collections}
         onClose={() => setFormVisible(false)}
         onSave={handleSave}
         C={C}
+        dbCategories={dbCategories}
       />
 
       <EditModal
@@ -517,6 +615,7 @@ const handleEditSave = async ({ description, amount, category }: { description: 
         onClose={() => { setEditVisible(false); setEditingTx(null); }}
         onSave={handleEditSave}
         C={C}
+        dbCategories={dbCategories}
       />
     </SafeAreaView>
   );
