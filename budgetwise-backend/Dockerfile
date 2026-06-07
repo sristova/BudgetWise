@@ -1,15 +1,17 @@
-# Dockerfile
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
+
+RUN apt-get update -y && apt-get install -y openssl
 
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npm run db:generate
+RUN npx prisma generate
 RUN npm run build
 
-# ─── Production image ───────────────────────────────────────
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
+
+RUN apt-get update -y && apt-get install -y openssl
 
 WORKDIR /app
 ENV NODE_ENV=production
@@ -22,4 +24,4 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
 
 EXPOSE 3000
-CMD ["node", "dist/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
