@@ -67,6 +67,11 @@ model User {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
+  // Notification preferences
+  notifyBudget     Boolean   @default(true) @map("notify_budget")
+  notifyWeekly     Boolean   @default(true) @map("notify_weekly")
+  notifyGoal       Boolean   @default(true) @map("notify_goal")
+
   // Relations
   refreshTokens    RefreshToken[]
   socialAccounts   SocialAccount[]

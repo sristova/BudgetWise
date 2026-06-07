@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { success, created, noContent, paginated, buildPaginationMeta } from '../lib/response';
 import { NotFoundError, ForbiddenError } from '../lib/errors';
 import { generateTransactionsPdf } from '../lib/pdf';
+import { budgetAlertEmail, sendMail } from '../lib/mail';
 import {
   createTransactionSchema,
   updateTransactionSchema,
@@ -80,6 +81,11 @@ export async function createTransaction(req: Request, res: Response) {
     include: { category: { select: { id: true, name: true, icon: true, color: true } } },
   });
 
+  // Preveri budget alert samo za stroške
+  if (transaction.type === 'EXPENSE') {
+    await checkBudgetAlert(userId, transaction.categoryId ?? undefined);
+  }
+
   return created(res, transaction);
 }
 
@@ -127,74 +133,68 @@ export async function getDashboardSummary(req: Request, res: Response) {
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
   const startOfWeek = new Date(now);
-startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7)); // Ponedeljek
-startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  startOfWeek.setHours(0, 0, 0, 0);
 
-const [
-  currentMonthStats,
-  lastMonthStats,
-  recentTransactions,
-  topCategories,
-  goals,
-  categories,
-  weeklyTransactions,  
-] = await Promise.all([
-  prisma.transaction.groupBy({
-    by: ['type'],
-    where: { userId, date: { gte: startOfMonth, lte: endOfMonth } },
-    _sum: { amount: true },
-    _count: true,
-  }),
-  prisma.transaction.groupBy({
-    by: ['type'],
-    where: { userId, date: { gte: startOfLastMonth, lte: endOfLastMonth } },
-    _sum: { amount: true },
-  }),
-  prisma.transaction.findMany({
-    where: { userId },
-    orderBy: { date: 'desc' },
-    take: 5,
-    include: { category: { select: { name: true, icon: true, color: true } } },
-  }),
-  prisma.transaction.groupBy({
-    by: ['categoryId'],
-    where: { userId, type: 'EXPENSE', date: { gte: startOfMonth, lte: endOfMonth } },
-    _sum: { amount: true },
-    orderBy: { _sum: { amount: 'desc' } },
-    take: 5,
-  }),
-  prisma.goal.findMany({
-    where: { userId, status: 'ACTIVE' },
-    orderBy: { deadline: 'asc' },
-    take: 3,
-  }),
-  prisma.category.findMany({
-    where: { userId },
-    orderBy: { name: 'asc' },
-  }),
-  prisma.transaction.findMany({
-    where: {
-      userId,
-      type: 'EXPENSE',
-      date: { gte: startOfWeek },
-    },
-    select: { amount: true, date: true },
-  }),
-]);
+  const [
+    currentMonthStats,
+    lastMonthStats,
+    recentTransactions,
+    topCategories,
+    goals,
+    categories,
+    weeklyTransactions,
+  ] = await Promise.all([
+    prisma.transaction.groupBy({
+      by: ['type'],
+      where: { userId, date: { gte: startOfMonth, lte: endOfMonth } },
+      _sum: { amount: true },
+      _count: true,
+    }),
+    prisma.transaction.groupBy({
+      by: ['type'],
+      where: { userId, date: { gte: startOfLastMonth, lte: endOfLastMonth } },
+      _sum: { amount: true },
+    }),
+    prisma.transaction.findMany({
+      where: { userId },
+      orderBy: { date: 'desc' },
+      take: 5,
+      include: { category: { select: { name: true, icon: true, color: true } } },
+    }),
+    prisma.transaction.groupBy({
+      by: ['categoryId'],
+      where: { userId, type: 'EXPENSE', date: { gte: startOfMonth, lte: endOfMonth } },
+      _sum: { amount: true },
+      orderBy: { _sum: { amount: 'desc' } },
+      take: 5,
+    }),
+    prisma.goal.findMany({
+      where: { userId, status: 'ACTIVE' },
+      orderBy: { deadline: 'asc' },
+      take: 3,
+    }),
+    prisma.category.findMany({
+      where: { userId },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.transaction.findMany({
+      where: { userId, type: 'EXPENSE', date: { gte: startOfWeek } },
+      select: { amount: true, date: true },
+    }),
+  ]);
 
   const income = currentMonthStats.find(s => s.type === 'INCOME')?._sum.amount ?? 0;
   const expenses = currentMonthStats.find(s => s.type === 'EXPENSE')?._sum.amount ?? 0;
   const lastIncome = lastMonthStats.find(s => s.type === 'INCOME')?._sum.amount ?? 0;
   const lastExpenses = lastMonthStats.find(s => s.type === 'EXPENSE')?._sum.amount ?? 0;
 
-  // Izračunaj porabo po dnevih: [Pon, Tor, Sre, Čet, Pet, Sob, Ned]
-const weeklySpending = [0, 0, 0, 0, 0, 0, 0];
-for (const tx of weeklyTransactions) {
-  const txDate = new Date(tx.date);
-  // getDay(): 0=Ned, 1=Pon ... 6=Sob → pretvorimo v 0=Pon ... 6=Ned
-  const dayIndex = (txDate.getDay() + 6) % 7;
-  weeklySpending[dayIndex] += Number(tx.amount);
-}
+  const weeklySpending = [0, 0, 0, 0, 0, 0, 0];
+  for (const tx of weeklyTransactions) {
+    const txDate = new Date(tx.date);
+    const dayIndex = (txDate.getDay() + 6) % 7;
+    weeklySpending[dayIndex] += Number(tx.amount);
+  }
 
   return success(res, {
     currentMonth: {
@@ -245,4 +245,121 @@ export async function exportTransactionsPdf(req: Request, res: Response) {
     { ...user, currency: user.currency.toString() },
     month
   );
+}
+
+// ─── Budget alert helper ──────────────────────────────────────────────────────
+
+async function checkBudgetAlert(userId: string, categoryId?: string) {
+  // Preveri preference — če notifyBudget ni vklopljen, končaj
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      currency: true,
+      notifyBudget: true,
+    },
+  });
+  if (!user?.notifyBudget) return;
+
+  const now = new Date();
+
+  // Poišči aktivne proračune za to kategorijo (ali vse)
+  const budgets = await prisma.budget.findMany({
+    where: {
+      userId,
+      isActive: true,
+      startDate: { lte: now },
+      OR: [{ endDate: null }, { endDate: { gte: now } }],
+      ...(categoryId ? { categoryId } : {}),
+    },
+    include: { category: { select: { name: true, icon: true } } },
+  });
+
+  for (const budget of budgets) {
+    const periodStart = getPeriodStart(budget.period, now);
+
+    const spent = await prisma.transaction.aggregate({
+      where: {
+        userId,
+        type: 'EXPENSE',
+        categoryId: budget.categoryId ?? undefined,
+        date: { gte: periodStart, lte: now },
+      },
+      _sum: { amount: true },
+    });
+
+    const spentAmount = parseFloat(spent._sum.amount?.toString() ?? '0');
+    const budgetAmount = parseFloat(budget.amount.toString());
+    const alertThreshold = parseFloat(budget.alertAt.toString()) / 100;
+    const usageRatio = spentAmount / budgetAmount;
+
+    if (usageRatio < alertThreshold) continue;
+
+    // Prepreči duplikat — ne pošlji če smo danes že poslali za ta proračun
+    const alreadySent = await prisma.notification.findFirst({
+      where: {
+        userId,
+        type: 'BUDGET_ALERT',
+        data: { path: ['budgetId'], equals: budget.id },
+        createdAt: { gte: startOfDay(now) },
+      },
+    });
+    if (alreadySent) continue;
+
+    const pct = Math.round(usageRatio * 100);
+    const isOver = usageRatio >= 1;
+    const categoryName = budget.category?.name ?? budget.name;
+    const categoryIcon = budget.category?.icon ?? '💰';
+
+    // Shrani in-app notifikacijo
+    await prisma.notification.create({
+      data: {
+        userId,
+        type: 'BUDGET_ALERT',
+        title: isOver ? `Proračun prekoračen: ${categoryIcon} ${categoryName}` : `Opozorilo proračuna: ${categoryIcon} ${categoryName}`,
+        body: `Porabili ste ${pct}% proračuna za ${categoryName}.`,
+        data: { budgetId: budget.id, usagePercent: pct },
+        sentAt: new Date(),
+      },
+    });
+
+    // Pošlji email (notifyBudget je že preverjen zgoraj)
+    const { subject, html } = budgetAlertEmail({
+      firstName: user.firstName,
+      budgetName: budget.name,
+      categoryName,
+      categoryIcon,
+      spent: spentAmount,
+      limit: budgetAmount,
+      percentage: pct,
+      currency: user.currency,
+    });
+    await sendMail({ to: user.email, subject, html });
+  }
+}
+
+function getPeriodStart(period: string, now: Date): Date {
+  const d = new Date(now);
+  switch (period) {
+    case 'DAILY':
+      d.setHours(0, 0, 0, 0);
+      return d;
+    case 'WEEKLY':
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      d.setHours(0, 0, 0, 0);
+      return d;
+    case 'YEARLY':
+      return new Date(d.getFullYear(), 0, 1);
+    case 'MONTHLY':
+    default:
+      return new Date(d.getFullYear(), d.getMonth(), 1);
+  }
+}
+
+function startOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }

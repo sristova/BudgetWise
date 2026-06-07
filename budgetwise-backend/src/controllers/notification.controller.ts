@@ -28,3 +28,27 @@ export async function markAllAsRead(req: Request, res: Response) {
   });
   return noContent(res);
 }
+
+// ─── Preferences ─────────────────────────────────────────────────────────────
+
+export async function getNotificationPreferences(req: Request, res: Response) {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { notifyBudget: true, notifyWeekly: true, notifyGoal: true },
+  });
+  return success(res, user);
+}
+
+export async function updateNotificationPreferences(req: Request, res: Response) {
+  const { notifyBudget, notifyWeekly, notifyGoal } = req.body;
+  const updated = await prisma.user.update({
+    where: { id: req.user!.id },
+    data: {
+      ...(notifyBudget !== undefined && { notifyBudget }),
+      ...(notifyWeekly !== undefined && { notifyWeekly }),
+      ...(notifyGoal   !== undefined && { notifyGoal }),
+    },
+    select: { notifyBudget: true, notifyWeekly: true, notifyGoal: true },
+  });
+  return success(res, updated);
+}

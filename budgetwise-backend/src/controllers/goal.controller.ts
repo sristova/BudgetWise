@@ -79,9 +79,6 @@ export async function addContribution(req: Request, res: Response) {
 
   const newAmount = Number(existing.currentAmount) + amount;
   const isCompleted = newAmount >= Number(existing.targetAmount);
-
-  // Дали целта штотуку се исполни? (порано не била COMPLETED, сега е)
-  // Ова спречува повторно праќање мејл при секоја следна уплата.
   const justCompleted = isCompleted && existing.status !== "COMPLETED";
 
   const goal = await prisma.goal.update({
@@ -92,12 +89,20 @@ export async function addContribution(req: Request, res: Response) {
     },
   });
 
-  // Кога целта штотуку се исполнила: зачувај нотификација + прати мејл.
   if (justCompleted) {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        currency: true,
+        notifyGoal: true,  // ← preference
+      },
+    });
 
     if (user) {
-      // 1. Зачувај нотификација во базата (се прикажува во апликацијата).
+      // Vedno shrani in-app notifikacijo
       await prisma.notification.create({
         data: {
           userId: user.id,
@@ -108,14 +113,16 @@ export async function addContribution(req: Request, res: Response) {
         },
       });
 
-      // 2. Прати мејл (не блокира - ако падне, само се логира).
-      const { subject, html } = goalCompletedEmail({
-        firstName: user.firstName,
-        goalName: goal.name,
-        targetAmount: Number(goal.targetAmount),
-        currency: goal.currency,
-      });
-      await sendMail({ to: user.email, subject, html });
+      // Pošlji email SAMO če je notifyGoal vklopljen
+      if (user.notifyGoal) {
+        const { subject, html } = goalCompletedEmail({
+          firstName: user.firstName,
+          goalName: goal.name,
+          targetAmount: Number(goal.targetAmount),
+          currency: goal.currency,
+        });
+        await sendMail({ to: user.email, subject, html });
+      }
     }
   }
 

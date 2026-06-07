@@ -1,5 +1,5 @@
 // app/(tabs)/profile.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Alert, Modal, ScrollView, StyleSheet, Switch,
   Text, TextInput, TouchableOpacity, View, ActivityIndicator,
@@ -26,6 +26,40 @@ export default function ProfileScreen() {
   const [notifyGoal, setNotifyGoal] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [prefsLoading, setPrefsLoading] = useState(true);
+
+  // Naloži preference ob zagonu
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get('/notifications/preferences');
+        setNotifyBudget(data.data.notifyBudget);
+        setNotifyWeekly(data.data.notifyWeekly);
+        setNotifyGoal(data.data.notifyGoal);
+      } catch {
+        // Ostanejo privzete vrednosti
+      } finally {
+        setPrefsLoading(false);
+      }
+    })();
+  }, []);
+
+  // Shrani spremembo na backend
+  const updatePref = useCallback(async (patch: {
+    notifyBudget?: boolean;
+    notifyWeekly?: boolean;
+    notifyGoal?: boolean;
+  }) => {
+    try {
+      await api.patch('/notifications/preferences', patch);
+    } catch {
+      Alert.alert('Napaka', 'Nastavitev obvestil ni bilo mogoče shraniti.');
+    }
+  }, []);
+
+  const handleNotifyBudget = (v: boolean) => { setNotifyBudget(v); updatePref({ notifyBudget: v }); };
+  const handleNotifyWeekly = (v: boolean) => { setNotifyWeekly(v); updatePref({ notifyWeekly: v }); };
+  const handleNotifyGoal   = (v: boolean) => { setNotifyGoal(v);   updatePref({ notifyGoal: v });   };
 
   const initials = [user?.firstName?.[0], user?.lastName?.[0]]
     .filter(Boolean).join('').toUpperCase() || user?.email?.[0]?.toUpperCase() || '?';
@@ -188,9 +222,17 @@ const handleExportPdf = async () => {
 
         {/* ── Obvestila ── */}
         <Section title="Obvestila" C={C}>
-          <SwitchRow icon="wallet-outline" label="Opozorila proračuna" value={notifyBudget} onChange={setNotifyBudget} C={C} />
-          <SwitchRow icon="document-text-outline" label="Tedensko poročilo" value={notifyWeekly} onChange={setNotifyWeekly} C={C} />
-          <SwitchRow icon="flag-outline" label="Dosežen cilj" value={notifyGoal} onChange={setNotifyGoal} C={C} />
+          {prefsLoading ? (
+            <View style={{ paddingVertical: 18, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={C.accent} />
+            </View>
+          ) : (
+            <>
+              <SwitchRow icon="wallet-outline" label="Opozorila proračuna" value={notifyBudget} onChange={handleNotifyBudget} C={C} />
+              <SwitchRow icon="document-text-outline" label="Tedensko poročilo" value={notifyWeekly} onChange={handleNotifyWeekly} C={C} />
+              <SwitchRow icon="flag-outline" label="Dosežen cilj" value={notifyGoal} onChange={handleNotifyGoal} C={C} />
+            </>
+          )}
         </Section>
 
         {/* ── Izvoz ── */}

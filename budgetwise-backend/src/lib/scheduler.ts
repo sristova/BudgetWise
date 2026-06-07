@@ -8,8 +8,9 @@ import { weeklyReportEmail, budgetAlertEmail } from './mail';
 cron.schedule('0 8 * * 1', async () => {
   console.log('[Scheduler] Pošiljam tedenska poročila...');
 
+  // Samo uporabniki z notifyWeekly === true
   const users = await prisma.user.findMany({
-    where: { isActive: true, isEmailVerified: true },
+    where: { isActive: true, isEmailVerified: true, notifyWeekly: true },
     select: { id: true, email: true, firstName: true, currency: true },
   });
 
@@ -37,7 +38,6 @@ cron.schedule('0 8 * * 1', async () => {
         }),
       ]);
 
-      // Pridobi imena kategorij
       const categoryIds = topCategories.map(c => c.categoryId).filter(Boolean) as string[];
       const categories = await prisma.category.findMany({
         where: { id: { in: categoryIds } },
@@ -62,7 +62,6 @@ cron.schedule('0 8 * * 1', async () => {
 
       await sendMail({ to: user.email, subject, html });
 
-      // Shrani notifikacijo v bazo
       await prisma.notification.create({
         data: {
           userId: user.id,
@@ -82,8 +81,9 @@ cron.schedule('0 8 * * 1', async () => {
 cron.schedule('0 * * * *', async () => {
   console.log('[Scheduler] Preverjam proračune...');
 
+  // Samo proračuni uporabnikov z notifyBudget === true
   const budgets = await prisma.budget.findMany({
-    where: { isActive: true },
+    where: { isActive: true, user: { notifyBudget: true } },
     include: {
       user: { select: { id: true, email: true, firstName: true, currency: true } },
       category: { select: { name: true, icon: true } },
@@ -111,7 +111,6 @@ cron.schedule('0 * * * *', async () => {
       const alertThreshold = Number(budget.alertAt);
 
       if (percentage >= alertThreshold) {
-        // Preveri da nismo že poslali opozorilo danes
         const alreadySent = await prisma.notification.findFirst({
           where: {
             userId: budget.userId,
