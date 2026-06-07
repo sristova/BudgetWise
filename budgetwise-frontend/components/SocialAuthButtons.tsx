@@ -40,73 +40,48 @@ export default function SocialAuthButtons() {
   React.useEffect(() => {
     if (response?.type === 'success') {
       const idToken = response.params?.id_token || response.authentication?.idToken;
-      
       if (idToken) {
         handleGoogleCallback(idToken);
       } else {
-        Alert.alert('Napaka', 'Google ni vrnil identifikacijskega žetona (idToken). Preverite OAuth nastavitve.');
+        Alert.alert('Napaka', 'Google ni vrnil identifikacijskega žetona.');
       }
     }
   }, [response]);
 
-  
-  const handleFacebook = () => {
-    Alert.alert('Facebook', 'Facebook prijava bo dostopna kmalu.');
-  };
-
   return (
     <View style={styles.container}>
-      {/* Ločilna črta */}
       <View style={styles.divider}>
         <View style={styles.line} />
         <Text style={styles.dividerText}>ali nadaljuj z</Text>
         <View style={styles.line} />
       </View>
 
-      {/* Gumbi */}
-      <View style={styles.row}>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => promptAsync()}
-          disabled={loadingProvider === 'google'}
-          activeOpacity={0.75}
-        >
-          {loadingProvider === 'google'
-            ? <ActivityIndicator size="small" color={C.warm} />
-            : <Text style={styles.googleIcon}>G</Text>
-          }
-          <Text style={styles.buttonLabel}>Google</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleFacebook}
-          disabled={loadingProvider === 'facebook'}
-          activeOpacity={0.75}
-        >
-          {loadingProvider === 'facebook'
-            ? <ActivityIndicator size="small" color={C.warm} />
-            : <Text style={styles.facebookIcon}>f</Text>
-          }
-          <Text style={styles.buttonLabel}>Facebook</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => promptAsync()}
+        disabled={loadingProvider === 'google'}
+        activeOpacity={0.75}
+      >
+        {loadingProvider === 'google'
+          ? <ActivityIndicator size="small" color={C.warm} />
+          : <Text style={styles.googleIcon}>G</Text>
+        }
+        <Text style={styles.buttonLabel}>Prijava z Google</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:    { gap: 16, marginTop: 8 },
-  divider:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  line:         { flex: 1, height: 0.5, backgroundColor: '#3D1020' },
-  dividerText:  { fontSize: 12, color: '#5C4A50' },
-  row:          { flexDirection: 'row', gap: 12 },
+  container:   { gap: 16, marginTop: 8 },
+  divider:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  line:        { flex: 1, height: 0.5, backgroundColor: '#3D1020' },
+  dividerText: { fontSize: 12, color: '#5C4A50' },
   button: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 0.5,
     borderColor: '#3D1020', backgroundColor: '#0D090C', minHeight: 50,
   },
   googleIcon:   { fontSize: 15, fontWeight: '700', color: '#EA4335' },
-  facebookIcon: { fontSize: 15, fontWeight: '700', color: '#4A90D9' },
   buttonLabel:  { fontSize: 14, fontWeight: '500', color: '#C8B8B0' },
 });

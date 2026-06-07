@@ -11,7 +11,29 @@ import type {
   TrendPoint,
 } from '../types/report.types';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Prevodni slovar: DB ime → slovensko ime za prikaz
+const CATEGORY_DISPLAY: Record<string, string> = {
+  'Food & Dining':  'Hrana in pijača',
+  'Transport':      'Prevoz',
+  'Entertainment':  'Zabava',
+  'Health':         'Zdravje',
+  'Shopping':       'Nakupovanje',
+  'Housing':        'Stanovanje',
+  'Education':      'Izobraževanje',
+  'Salary':         'Plača',
+  'Investment':     'Investicije',
+  'Freelance':      'Freelance',
+  'Other':          'Ostalo',
+  // Slovenske že pravilne — pustimo kot so
+};
+
+function getCategoryLabel(name: string | undefined | null): string {
+  if (!name) return 'Nekategorizirano';
+  return CATEGORY_DISPLAY[name] ?? name;
+}
+
+// ─── Helpers 
 
 const MONTH_LABELS_SL = [
   '', 'Januar', 'Februar', 'Marec', 'April', 'Maj', 'Junij',
@@ -137,7 +159,7 @@ async function getCategoryStats(
 
     return {
       categoryId: row.categoryId,
-      categoryName: cat?.name ?? 'Nekategorizirano',
+      categoryName: getCategoryLabel(cat?.name),
       categoryIcon: cat?.icon ?? '💰',
       categoryColor: cat?.color ?? '#A0263A',
       total,
@@ -224,7 +246,7 @@ export async function getMonthlyReportService(
       ? {
           description: biggestExpense.description,
           amount: toNumber(biggestExpense.amount),
-          categoryName: biggestExpense.category?.name ?? 'Nekategorizirano',
+          categoryName: getCategoryLabel(biggestExpense.category?.name),
           categoryIcon: biggestExpense.category?.icon ?? '💰',
           date: biggestExpense.date.toISOString().split('T')[0],
         }
@@ -334,7 +356,7 @@ export async function getYearlyReportService(
     const total = toNumber(row._sum.amount);
     return {
       categoryId: row.categoryId,
-      categoryName: cat?.name ?? 'Nekategorizirano',
+      categoryName: getCategoryLabel(cat?.name),
       categoryIcon: cat?.icon ?? '💰',
       categoryColor: cat?.color ?? '#A0263A',
       total,
@@ -518,7 +540,7 @@ export async function getStatisticsService(
       ? {
           description: biggestExpense.description,
           amount: toNumber(biggestExpense.amount),
-          categoryName: biggestExpense.category?.name ?? 'Nekategorizirano',
+          categoryName: getCategoryLabel(biggestExpense.category?.name),
           categoryIcon: biggestExpense.category?.icon ?? '💰',
           date: biggestExpense.date.toISOString().split('T')[0],
         }
