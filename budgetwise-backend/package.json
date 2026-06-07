@@ -40,7 +40,8 @@
     "pino-http": "^9.0.0",
     "pino-pretty": "^11.0.0",
     "uuid": "^9.0.1",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "prisma": "^5.10.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -55,7 +56,6 @@
     "@types/nodemailer": "^8.0.0",
     "@types/pdfkit": "^0.17.6",
     "@types/uuid": "^9.0.8",
-    "prisma": "^5.10.0",
     "tsx": "^4.7.1",
     "typescript": "^5.3.3"
   }
