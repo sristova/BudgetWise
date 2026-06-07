@@ -15,5 +15,3 @@ npm-debug.*
 .DS_Store
 Thumbs.db
 
-# Prisma
-prisma/migrations/
