@@ -1,18 +1,7 @@
-// src/lib/mail.ts
-import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 import { logger } from "./logger";
 
-// Транспортер за праќање мејлови преку SMTP (Gmail).
-// Се чита од .env, така што нема тајни во кодот.
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: Number(process.env.SMTP_PORT) || 465,
-  secure: Number(process.env.SMTP_PORT) === 465, // true za 465
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
 
 interface SendMailOptions {
   to: string;
@@ -20,32 +9,24 @@ interface SendMailOptions {
   html: string;
 }
 
-/**
- * Праќа мејл. Не фрла грешка нагоре - само логира,
- * за да не ја сруши главната операција ако мејлот не успее.
- */
 export async function sendMail({
   to,
   subject,
   html,
 }: SendMailOptions): Promise<void> {
   try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"BudgetWise" <no-reply@budgetwise.app>',
+    await sgMail.send({
+      from: process.env.SMTP_FROM || "BudgetWise <budgetwiseoffical@gmail.com>",
       to,
       subject,
       html,
     });
     logger.info(`Email sent to ${to}: ${subject}`);
-   } catch (err: any) {
-  logger.error(`Failed to send email to ${to}: ${err?.message ?? String(err)}`);
-  logger.error(JSON.stringify(err, Object.getOwnPropertyNames(err)));
-}
+  } catch (err: any) {
+    logger.error(`Failed to send email to ${to}: ${err?.message ?? String(err)}`);
+  }
 }
 
-/**
- * Готов темплејт за кога корисникот ќе ја исполни целта за штедење.
- */
 export function goalCompletedEmail(params: {
   firstName?: string | null;
   goalName: string;
