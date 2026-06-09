@@ -6,8 +6,8 @@ import { logger } from "./logger";
 // Се чита од .env, така што нема тајни во кодот.
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: false, // true за порта 465, false за 587
+  port: Number(process.env.SMTP_PORT) || 465,
+  secure: Number(process.env.SMTP_PORT) === 465, // true za 465
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
