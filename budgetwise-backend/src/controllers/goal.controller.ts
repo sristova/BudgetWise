@@ -97,12 +97,13 @@ export async function addContribution(req: Request, res: Response) {
         email: true,
         firstName: true,
         currency: true,
-        notifyGoal: true,  // ← preference
+        notifyGoal: true,
       },
     });
 
+    console.log('[GOAL] justCompleted=true, user:', user?.email, 'notifyGoal:', user?.notifyGoal);
+
     if (user) {
-      // Vedno shrani in-app notifikacijo
       await prisma.notification.create({
         data: {
           userId: user.id,
@@ -113,8 +114,8 @@ export async function addContribution(req: Request, res: Response) {
         },
       });
 
-      // Pošlji email SAMO če je notifyGoal vklopljen
       if (user.notifyGoal) {
+        console.log('[GOAL] Sending email to:', user.email);
         const { subject, html } = goalCompletedEmail({
           firstName: user.firstName,
           goalName: goal.name,
@@ -122,6 +123,9 @@ export async function addContribution(req: Request, res: Response) {
           currency: goal.currency,
         });
         await sendMail({ to: user.email, subject, html });
+        console.log('[GOAL] sendMail called');
+      } else {
+        console.log('[GOAL] notifyGoal is false, skipping email');
       }
     }
   }
@@ -137,3 +141,4 @@ export async function deleteGoal(req: Request, res: Response) {
   await prisma.goal.delete({ where: { id } });
   return noContent(res);
 }
+
