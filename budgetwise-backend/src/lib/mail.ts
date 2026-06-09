@@ -37,9 +37,10 @@ export async function sendMail({
       html,
     });
     logger.info(`Email sent to ${to}: ${subject}`);
-  } catch (err) {
-    logger.error(`Failed to send email to ${to}:`, err);
-  }
+   } catch (err: any) {
+  logger.error(`Failed to send email to ${to}: ${err?.message ?? String(err)}`);
+  logger.error(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+}
 }
 
 /**
