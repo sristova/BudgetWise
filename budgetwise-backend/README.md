@@ -1,253 +1,261 @@
-# BudgetWise Backend — Setup & Deployment Guide
+# BudgetWise — Backend
 
-## Why PostgreSQL over MySQL / SQLite
+REST API za aplikacijo BudgetWise, zgrajen z **Node.js + Express**, **TypeScript**, **Prisma ORM** in **PostgreSQL**.
 
-| Feature | PostgreSQL ✅ | MySQL | SQLite |
-|---|---|---|---|
-| Decimal precision for money | ✅ Native DECIMAL | ✅ | ⚠️ Float bugs |
-| JSONB for metadata/AI chats | ✅ Native, indexed | ⚠️ JSON only | ❌ |
-| Window functions (analytics) | ✅ Full | ⚠️ Partial | ⚠️ Limited |
-| Concurrent users | ✅ Excellent | ✅ | ❌ |
-| Row-level security | ✅ | ❌ | ❌ |
-| Full-text search | ✅ GIN indexes | ⚠️ | ❌ |
-| UUID native | ✅ | ⚠️ | ❌ |
+Glavna dokumentacija projekta je v [korenskem README](../README.md).
 
 ---
 
-## Folder Structure
+## Kazalo vsebine
+
+- [Namestitev](#namestitev)
+  - [Z Dockerjem](#z-dockerjem-priporočeno)
+  - [Brez Dockerja](#brez-dockerja-lokalno)
+- [Okoljske spremenljivke](#okoljske-spremenljivke)
+- [Zagon](#zagon)
+- [API dokumentacija](#api-dokumentacija)
+- [Podatkovna baza](#podatkovna-baza)
+- [Struktura](#struktura)
+
+---
+
+## Namestitev
+
+### Predpogoji
+
+- Node.js >= 18
+- npm >= 9
+- PostgreSQL (lokalno ali Docker)
+- Groq API ključ → [console.groq.com](https://console.groq.com)
+- SendGrid API ključ → [sendgrid.com](https://sendgrid.com)
+- Cloudinary račun → [cloudinary.com](https://cloudinary.com)
+
+---
+
+### Z Dockerjem (priporočeno)
+
+```bash
+# Kopiraj in nastavi okoljske spremenljivke
+cp .env.example .env
+# Uredi .env (glej razdelek Okoljske spremenljivke)
+
+# Zaženi bazo in API
+docker-compose up -d
+```
+
+### Brez Dockerja (lokalno)
+
+```bash
+# Namesti odvisnosti
+npm install
+
+# Ustvari .env iz predloge in ga uredi
+cp .env.example .env
+
+# Generiraj Prisma klienta
+npm run db:generate
+
+# Ustvari tabele v bazi
+npx prisma db push
+
+# (Neobvezno) Napolni bazo z demo podatki
+npm run db:seed
+
+# Zaženi razvojni strežnik
+npm run dev
+```
+
+---
+
+## Okoljske spremenljivke
+
+Vse okoljske spremenljivke so opisane v datoteki [`.env.example`](./.env.example). Skopiraj jo v `.env` in nastavi svoje vrednosti:
+
+```bash
+cp .env.example .env
+```
+
+Potrebuješ veljavne ključe za:
+
+- **PostgreSQL** bazo (`DATABASE_URL`)
+- **JWT** skrivnosti (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`)
+- **Groq AI** (`GROQ_API_KEY`)
+- **SendGrid** za e-poštna obvestila (`SENDGRID_API_KEY`)
+- **Cloudinary** za profilne slike (`CLOUDINARY_*`)
+
+> ⚠️ Datoteke `.env` nikoli ne nalagaj v Git — vsebuje skrivnosti. V repozitorij je vključena le predloga `.env.example`.
+
+---
+
+## Zagon
+
+### Razvojno okolje
+
+```bash
+npm run dev
+```
+
+### Produkcija
+
+```bash
+npm run build
+npm start
+
+# Ali z Dockerjem
+docker-compose -f docker-compose.yml up -d
+```
+
+---
+
+## API dokumentacija
+
+Osnovna pot: `http://localhost:3000/api/v1`
+
+Vsi zaščiteni endpointi zahtevajo glavo:
+
+```
+Authorization: Bearer <access_token>
+```
+
+### Avtentikacija
+
+| Metoda | Pot              | Opis                                 |
+| ------ | ---------------- | ------------------------------------ |
+| POST   | `/auth/register` | Registracija novega uporabnika       |
+| POST   | `/auth/login`    | Prijava, vrne access + refresh token |
+| POST   | `/auth/refresh`  | Obnovi access token                  |
+| POST   | `/auth/logout`   | Odjava (razveljavi refresh token)    |
+| POST   | `/auth/google`   | Prijava z Google računom             |
+| POST   | `/auth/facebook` | Prijava s Facebook računom           |
+
+### Uporabnik
+
+| Metoda | Pot                      | Opis                      |
+| ------ | ------------------------ | ------------------------- |
+| GET    | `/users/profile`         | Pridobi profil uporabnika |
+| PATCH  | `/users/profile`         | Posodobi ime in priimek   |
+| POST   | `/users/upload-avatar`   | Naloži profilno sliko     |
+| POST   | `/users/change-password` | Spremeni geslo            |
+| DELETE | `/users/account`         | Izbriši račun             |
+
+### Transakcije
+
+| Metoda | Pot                       | Opis                                        |
+| ------ | ------------------------- | ------------------------------------------- |
+| GET    | `/transactions`           | Seznam transakcij (filtriranje, paginacija) |
+| GET    | `/transactions/dashboard` | Dashboard podatki                           |
+| POST   | `/transactions`           | Dodaj transakcijo                           |
+| PATCH  | `/transactions/:id`       | Uredi transakcijo                           |
+| DELETE | `/transactions/:id`       | Izbriši transakcijo                         |
+
+### Cilji
+
+| Metoda | Pot                     | Opis                      |
+| ------ | ----------------------- | ------------------------- |
+| GET    | `/goals`                | Seznam varčevalnih ciljev |
+| POST   | `/goals`                | Dodaj cilj                |
+| PATCH  | `/goals/:id`            | Posodobi cilj             |
+| POST   | `/goals/:id/contribute` | Vplačaj v cilj            |
+| DELETE | `/goals/:id`            | Izbriši cilj              |
+
+> Ob vplačilu, ki doseže ali preseže ciljni znesek, se cilj samodejno označi kot dosežen, ustvari se obvestilo, uporabnik pa prejme e-pošto prek SendGrid.
+
+### AI klepet
+
+| Metoda | Pot                      | Opis                            |
+| ------ | ------------------------ | ------------------------------- |
+| GET    | `/ai-chat/history`       | Zgodovina klepeta               |
+| POST   | `/ai-chat/message`       | Pošlji sporočilo asistentu      |
+| POST   | `/ai-chat/parse-receipt` | Analiziraj račun (base64 slika) |
+| DELETE | `/ai-chat`               | Izbriši zgodovino klepeta       |
+
+### Poročila
+
+| Metoda | Pot                   | Opis                        |
+| ------ | --------------------- | --------------------------- |
+| GET    | `/reports/monthly`    | Mesečno poročilo            |
+| GET    | `/reports/yearly`     | Letno poročilo              |
+| GET    | `/reports/categories` | Poraba po kategorijah       |
+| GET    | `/reports/trends`     | Trendi za zadnjih N mesecev |
+| GET    | `/reports/statistics` | Statistike za mesec         |
+
+### Health check
+
+```
+GET /health  →  { status: "ok", timestamp: "...", version: "1.0.0" }
+```
+
+---
+
+## Podatkovna baza
+
+Aplikacija uporablja **PostgreSQL** s Prisma ORM.
+
+### Modeli
+
+- **User** — uporabniški račun (email, geslo, valuta, časovni pas, profilna slika)
+- **RefreshToken** — JWT refresh tokeni z revokacijo
+- **Category** — kategorije transakcij (Hrana, Prevoz, Zabava...)
+- **Transaction** — prihodki in odhodki z metapodatki
+- **Budget** — proračuni po kategorijah (dnevni / tedenski / mesečni)
+- **Goal** — varčevalni cilji s ciljnim zneskom in rokom
+- **Notification** — obvestila (budget alert, goal reminder, achievement...)
+- **AiChat** — zgodovina AI klepeta
+- **Report** — predpomnjene analitike
+
+### Upravljanje baze
+
+```bash
+# Ustvari / posodobi tabele v bazi
+npx prisma db push
+
+# Odpri Prisma Studio (vizualni pregled baze)
+npm run db:studio
+
+# Napolni z demo podatki
+npm run db:seed
+
+# Produkcijska migracija (brez interaktivnih vprašanj)
+npm run db:migrate:prod
+```
+
+---
+
+## Struktura
 
 ```
 budgetwise-backend/
-├── prisma/
-│   └── schema.prisma          # All DB models
 ├── src/
-│   ├── server.ts              # Entry point
-│   ├── app.ts                 # Express setup + middleware
-│   ├── lib/
-│   │   ├── prisma.ts          # Prisma singleton
-│   │   ├── jwt.ts             # Token signing/verification
-│   │   ├── logger.ts          # Pino logger
-│   │   ├── errors.ts          # AppError classes
-│   │   └── response.ts        # API response helpers
+│   ├── controllers/            # aiChat, auth, budget, category,
+│   │                           #   goal, notification, report,
+│   │                           #   transaction, user
+│   ├── routes/                 # Express routerji za vsak modul
 │   ├── middleware/
-│   │   ├── authenticate.ts    # JWT auth guard
-│   │   ├── rateLimit.ts       # Rate limiting
-│   │   ├── errorHandler.ts    # Global error handler
-│   │   └── notFound.ts        # 404 handler
-│   ├── routes/
-│   │   ├── index.ts           # Route aggregator
-│   │   ├── auth.routes.ts
-│   │   ├── transaction.routes.ts
-│   │   ├── category.routes.ts
-│   │   ├── budget.routes.ts
-│   │   ├── goal.routes.ts
-│   │   ├── report.routes.ts
-│   │   ├── notification.routes.ts
-│   │   └── aiChat.routes.ts
-│   ├── controllers/           # Request handlers
-│   ├── validators/            # Zod schemas
-│   └── prisma/
-│       └── seed.ts            # Demo data
-├── .env.example
+│   │   ├── authenticate.ts     # JWT preverjanje
+│   │   ├── errorHandler.ts     # Centralno lovljenje napak
+│   │   ├── notFound.ts         # 404 handler
+│   │   └── rateLimit.ts        # Globalni rate limiter
+│   ├── lib/
+│   │   ├── prisma.ts           # Singleton Prisma klient
+│   │   ├── jwt.ts              # Podpisovanje / preverjanje tokenov
+│   │   ├── logger.ts           # Pino logger
+│   │   ├── errors.ts           # Prilagojeni razredi napak
+│   │   ├── response.ts         # Standardizirani API odgovori
+│   │   ├── mail.ts             # Pošiljanje e-pošte (SendGrid)
+│   │   ├── socialAuth.ts       # Google / Facebook OAuth
+│   │   └── tokenService.ts     # Upravljanje refresh tokenov
+│   ├── config/
+│   │   └── cloudinary.ts       # Cloudinary konfiguracija
+│   ├── services/
+│   │   └── report.service.ts   # Poslovna logika za poročila
+│   ├── validators/             # Zod sheme za vhodne podatke
+│   ├── types/
+│   │   └── report.types.ts     # TypeScript tipi za poročila
+│   ├── app.ts                  # Express konfiguracija
+│   └── server.ts               # Vstopna točka
+├── prisma/schema.prisma        # Podatkovni model
+├── .env.example                # Predloga za okoljske spremenljivke
 ├── Dockerfile
-├── docker-compose.yml
-├── package.json
+├── docker-compose.yml          # PostgreSQL + API
 └── tsconfig.json
 ```
-
----
-
-## Local Development Setup
-
-### 1. Clone and install
-```bash
-git clone <repo>
-cd budgetwise-backend
-npm install
-```
-
-### 2. Setup environment
-```bash
-cp .env.example .env
-# Edit .env with your values
-```
-
-### 3. Start PostgreSQL (Docker)
-```bash
-docker compose up postgres -d
-```
-
-### 4. Run migrations and seed
-```bash
-npm run db:migrate
-npm run db:generate
-npm run db:seed
-```
-
-### 5. Start dev server
-```bash
-npm run dev
-# API running at http://localhost:3000/api/v1
-```
-
----
-
-## API Endpoints
-
-### Auth
-```
-POST   /api/v1/auth/register     Register new user
-POST   /api/v1/auth/login        Login
-POST   /api/v1/auth/refresh      Refresh access token
-POST   /api/v1/auth/logout       Logout (revoke refresh token)
-GET    /api/v1/auth/me           Current user info
-```
-
-### Transactions
-```
-GET    /api/v1/transactions               List with pagination + filters
-GET    /api/v1/transactions/dashboard     Dashboard summary
-GET    /api/v1/transactions/:id           Single transaction
-POST   /api/v1/transactions               Create
-PATCH  /api/v1/transactions/:id           Update
-DELETE /api/v1/transactions/:id           Delete
-```
-
-### Query params for GET /transactions
-```
-?page=1&limit=20
-?type=EXPENSE
-?categoryId=uuid
-?startDate=2024-01-01&endDate=2024-01-31
-?search=mercator
-?sortBy=date&sortOrder=desc
-```
-
-### Goals
-```
-GET    /api/v1/goals
-POST   /api/v1/goals
-PATCH  /api/v1/goals/:id
-POST   /api/v1/goals/:id/contribute     Add money to goal
-DELETE /api/v1/goals/:id
-```
-
-### Reports
-```
-GET    /api/v1/reports/monthly?year=2024&month=1
-GET    /api/v1/reports/yearly?year=2024
-GET    /api/v1/reports/categories?startDate=2024-01-01&endDate=2024-01-31
-```
-
-### AI Chat
-```
-GET    /api/v1/ai-chat/history
-POST   /api/v1/ai-chat/message     { "message": "..." }
-DELETE /api/v1/ai-chat/history
-```
-
----
-
-## Expo Integration
-
-### Find your local IP (for Expo Go)
-```bash
-# macOS/Linux
-ipconfig getifaddr en0
-
-# Windows
-ipconfig
-```
-
-### Install in Expo project
-```bash
-npx expo install expo-secure-store
-npm install axios
-```
-
-Copy `EXPO_API_CLIENT.ts` → `lib/api.ts` in your Expo project.
-
-Update the IP in `lib/api.ts`:
-```ts
-const BASE_URL = __DEV__
-  ? 'http://YOUR_LOCAL_IP:3000/api/v1'
-  : 'https://your-production-url.com/api/v1';
-```
-
-### Auth Flow in Expo
-```ts
-// Login
-const user = await authApi.login('demo@budgetwise.app', 'Demo1234!');
-// Tokens are automatically saved to SecureStore
-
-// Make authenticated requests
-const dashboard = await transactionsApi.getDashboard();
-// Access token is automatically attached
-
-// Token refresh happens automatically on 401
-// No manual handling needed
-```
-
----
-
-## Deployment
-
-### Railway (easiest)
-1. Push to GitHub
-2. New project on [railway.app](https://railway.app)
-3. Add PostgreSQL plugin
-4. Add environment variables from `.env.example`
-5. Deploy — Railway auto-detects Node.js
-
-### Render
-1. New Web Service → connect GitHub repo
-2. Build: `npm run build && npm run db:migrate:prod`
-3. Start: `npm start`
-4. Add PostgreSQL database (free tier available)
-
-### DigitalOcean / VPS
-```bash
-# On server
-git clone <repo>
-cd budgetwise-backend
-cp .env.example .env
-# fill in .env
-
-docker compose up -d
-docker compose exec api npx prisma migrate deploy
-docker compose exec api npm run db:seed
-```
-
-### Production checklist
-- [ ] Strong JWT secrets (min 32 chars, random)
-- [ ] BCRYPT_ROUNDS=12
-- [ ] NODE_ENV=production
-- [ ] ALLOWED_ORIGINS set to your Expo app URLs
-- [ ] PostgreSQL not exposed publicly
-- [ ] HTTPS via reverse proxy (nginx / Caddy)
-- [ ] Set up daily DB backups
-
----
-
-## Database Indexing
-
-Already included in schema:
-- `users.email` — login lookup
-- `transactions.userId` — all user queries
-- `transactions.userId + date` — date range filters
-- `transactions.userId + type` — income/expense split
-- `refresh_tokens.token` — O(1) token lookup
-- `ai_chats.userId + createdAt` — chat history
-
----
-
-## Security Features
-
-- Helmet.js — secure HTTP headers
-- CORS — origin whitelist
-- Rate limiting — 100 req/15min global, 10/15min for auth
-- JWT rotation — refresh tokens are single-use
-- bcrypt — passwords hashed with 12 rounds
-- Zod — all inputs validated before DB
-- No sensitive data in error responses (production)
-- Cascade deletes — user data cleaned up properly

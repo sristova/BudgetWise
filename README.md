@@ -1,8 +1,17 @@
 # BudgetWise 💰
+
 [![Download APK](https://img.shields.io/badge/Download-APK-brightgreen?logo=android)](https://github.com/sristova/BudgetWise/releases/latest/download/BudgetWise.apk)
 [![Prijavi problem](https://img.shields.io/badge/Prijavi_problem-EA4335?style=flat&logo=gmail&logoColor=white)](mailto:budgetwiseofficial@gmail.com)
 
 Mobilna aplikacija za upravljanje osebnih financ, zgrajena z **React Native (Expo)** in **Node.js backendom**. Omogoča sledenje transakcijam, varčevalnim ciljem, mesečnim poročilom in AI finančnemu asistentu — vse na enem mestu.
+
+## 📲 Prenos aplikacije
+
+Najnovejšo različico Android aplikacije lahko preneseš neposredno:
+
+**➡️ [Prenesi BudgetWise.apk](https://github.com/sristova/BudgetWise/releases/latest/download/BudgetWise.apk)**
+
+> Po prenosu boš morda moral v nastavitvah telefona dovoliti namestitev iz neznanih virov.
 
 ---
 
@@ -14,12 +23,11 @@ Mobilna aplikacija za upravljanje osebnih financ, zgrajena z **React Native (Exp
 - [Namestitev](#namestitev)
   - [Frontend (Expo)](#frontend-expo)
   - [Backend (Node.js)](#backend-nodejs)
-- [Okoljske spremenljivke](#okoljske-spremenljivke)
 - [Zagon](#zagon)
-- [API dokumentacija](#api-dokumentacija)
-- [Podatkovna baza](#podatkovna-baza)
 - [Struktura projekta](#struktura-projekta)
+- [Dokumentacija backenda](#dokumentacija-backenda)
 - [Znane omejitve](#znane-omejitve)
+- [Avtorji](#avtorji)
 
 ---
 
@@ -27,7 +35,7 @@ Mobilna aplikacija za upravljanje osebnih financ, zgrajena z **React Native (Exp
 
 - **Domov** — finančni pregled (preostanek, prihodki, stroški), tedenski graf porabe, nedavne transakcije in hiter dostop do pogostih dejanj
 - **Transakcije** — seznam prihodkov in odhodkov s filtri po kategorijah; skeniranje računov s kamero ali galerije
-- **Varčevalni cilji** — ustvarjanje in sledenje ciljem z napredovalno vrstico in možnostjo vplačila
+- **Varčevalni cilji** — ustvarjanje in sledenje ciljem z napredovalno vrstico in možnostjo vplačila; ob dosegu cilja uporabnik prejme obvestilo po e-pošti
 - **AI asistent** — klepet z Groq LLM (Llama 3.3 70B), ki odgovarja na vprašanja o osebnih financah v slovenščini
 - **Poročilo** — mesečni in letni povzetek prihodkov, stroškov, prihrankov in porabe po kategorijah z grafi
 - **Profil** — urejanje imena in priimka, menjava profilne slike (Cloudinary), sprememba gesla, preklapljanje med temnim/svetlim načinom, nastavitve obvestil
@@ -38,83 +46,18 @@ Mobilna aplikacija za upravljanje osebnih financ, zgrajena z **React Native (Exp
 
 ---
 
-## Struktura projekta
+## Arhitektura
 
 ```
-BudgetWise/
-├── budgetwise-frontend/
-│   ├── app/
-│   │   ├── (tabs)/
-│   │   │   ├── _layout.tsx         # Tab navigacija (ikone, barve)
-│   │   │   ├── index.tsx           # Domov — finančni pregled + profil modal
-│   │   │   ├── transactions.tsx    # Transakcije + skeniranje
-│   │   │   ├── goals.tsx           # Varčevalni cilji
-│   │   │   ├── assistant.tsx       # AI klepet (Groq)
-│   │   │   ├── report.tsx          # Mesečno / letno poročilo
-│   │   │   └── profile.tsx         # Profil in nastavitve
-│   │   ├── _layout.tsx             # Root layout + auth gating
-│   │   ├── welcome.tsx             # Uvodni zaslon
-│   │   ├── login.tsx               # Prijava
-│   │   ├── register.tsx            # Registracija
-│   │   └── +not-found.tsx          # 404 stran
-│   ├── assets/                     # Ikone, pisave
-│   ├── components/
-│   │   ├── SocialAuthButtons.tsx   # Google / Facebook prijava
-│   │   └── statistics/             # Komponente za grafe
-│   │       ├── CategoryBar.tsx
-│   │       ├── CategoryPieChart.tsx
-│   │       ├── StatCard.tsx
-│   │       ├── StatisticsSkeleton.tsx
-│   │       ├── TrendChart.tsx
-│   │       └── index.ts
-│   ├── contexts/
-│   │   ├── AuthContext.tsx         # Upravljanje seje in uporabnika
-│   │   └── ThemeContext.tsx        # Temni / svetli način
-│   ├── lib/
-│   │   ├── api.ts                  # Axios + interceptorji za token refresh
-│   │   └── reportsApi.ts           # API klici za poročila
-│   ├── types/
-│   │   └── report.ts               # TypeScript tipi za poročila
-│   ├── .env                        # EXPO_PUBLIC_API_URL
-│   ├── app.json                    # Expo konfiguracija
-│   ├── package.json
-│   └── tsconfig.json
-└── budgetwise-backend/
-    ├── src/
-    │   ├── controllers/            # aiChat, auth, budget, category,
-    │   │                           #   goal, notification, report,
-    │   │                           #   transaction, user
-    │   ├── routes/                 # Express routerji za vsak modul
-    │   ├── middleware/
-    │   │   ├── authenticate.ts     # JWT preverjanje
-    │   │   ├── errorHandler.ts     # Centralno lovljenje napak
-    │   │   ├── notFound.ts         # 404 handler
-    │   │   └── rateLimit.ts        # Globalni rate limiter
-    │   ├── lib/
-    │   │   ├── prisma.ts           # Singleton Prisma klient
-    │   │   ├── jwt.ts              # Podpisovanje / preverjanje tokenov
-    │   │   ├── logger.ts           # Pino logger
-    │   │   ├── errors.ts           # Prilagojeni razredi napak
-    │   │   ├── response.ts         # Standardizirani API odgovori
-    │   │   ├── socialAuth.ts       # Google / Facebook OAuth
-    │   │   └── tokenService.ts     # Upravljanje refresh tokenov
-    │   ├── config/
-    │   │   └── cloudinary.ts       # Cloudinary konfiguracija
-    │   ├── services/
-    │   │   └── report.service.ts   # Poslovna logika za poročila
-    │   ├── validators/             # Zod sheme za vhodne podatke
-    │   ├── types/
-    │   │   └── report.types.ts     # TypeScript tipi za poročila
-    │   ├── app.ts                  # Express konfiguracija
-    │   └── server.ts               # Vstopna točka
-    ├── prisma/schema.prisma        # Podatkovni model
-    ├── .env                        # Okoljske spremenljivke
-    ├── Dockerfile
-    ├── docker-compose.yml          # PostgreSQL + API
-    └── tsconfig.json
+Expo mobilna aplikacija  ↔  REST API (/api/v1)  ↔  PostgreSQL + Groq AI
 ```
 
-**Komunikacija:** Expo mobilna aplikacija ↔ REST API (`/api/v1`) ↔ PostgreSQL + Groq AI
+Aplikacija je razdeljena na dva dela:
+
+- **`budgetwise-frontend/`** — React Native (Expo) mobilna aplikacija
+- **`budgetwise-backend/`** — Node.js + Express REST API s PostgreSQL bazo
+
+Podrobnosti o API-ju, podatkovni bazi in strukturi backenda so v [dokumentaciji backenda](./budgetwise-backend/README.md).
 
 ---
 
@@ -145,6 +88,7 @@ BudgetWise/
 | bcryptjs                | ^2.4    | Hashiranje gesel                     |
 | Zod                     | ^3.22   | Validacija vhodnih podatkov          |
 | Groq API                | —       | LLM (Llama 3.3 70B + Llama 4 Scout)  |
+| SendGrid                | —       | Pošiljanje e-poštnih obvestil        |
 | Cloudinary              | —       | Shranjevanje profilnih slik          |
 | Helmet + CORS           | —       | Varnost                              |
 | Pino                    | ^8.19   | Strukturirani logi                   |
@@ -160,6 +104,7 @@ BudgetWise/
 - npm >= 9
 - PostgreSQL (lokalno ali Docker)
 - Groq API ključ → [console.groq.com](https://console.groq.com)
+- SendGrid API ključ → [sendgrid.com](https://sendgrid.com)
 - Cloudinary račun → [cloudinary.com](https://cloudinary.com)
 - Expo Go aplikacija na telefonu (za testiranje)
 
@@ -175,10 +120,10 @@ cd BudgetWise/budgetwise-frontend
 # 2. Namesti odvisnosti
 npm install
 
-# 3. Ustvari .env datoteko
-# Ustvari datoteko .env v mapi budgetwise-frontend/ z vsebino:
-# EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api/v1
-# (zamenjaj 192.168.x.x z lokalnim IP naslovom svojega računalnika — preveri z ipconfig)
+# 3. Ustvari .env datoteko iz predloge
+cp .env.example .env
+# Uredi .env in nastavi EXPO_PUBLIC_API_URL na lokalni IP naslov
+# svojega računalnika (preveri z `ipconfig` na Windows)
 
 # 4. Zaženi razvojni strežnik
 npm start
@@ -191,40 +136,27 @@ Odpri Expo Go na telefonu in skeniraj QR kodo.
 > New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
 > ```
 > Nato premakni projekt v krajšo pot (npr. `C:\Dev\BudgetWise\`) in ponovi namestitev.
+>
+> **Opomba glede OneDrive:** Projekta ne hrani v mapi, ki jo sinhronizira OneDrive — to lahko poškoduje `node_modules`. Uporabi lokalno pot, npr. `C:\Dev\BudgetWise\`.
 
 ---
 
 ### Backend (Node.js)
 
-#### Z Dockerjem (priporočeno)
+Celotna navodila za backend (Docker, baza, okoljske spremenljivke) so v [budgetwise-backend/README.md](./budgetwise-backend/README.md). Na kratko:
 
 ```bash
 cd budgetwise-backend
 
-# Kopiraj in nastavi okoljske spremenljivke
+# Ustvari .env iz predloge in ga uredi
 cp .env.example .env
-# Uredi .env (glej razdelek Okoljske spremenljivke)
-
-# Zaženi bazo in API
-docker-compose up -d
-```
-
-#### Brez Dockerja (lokalno)
-
-```bash
-cd budgetwise-backend
 
 # Namesti odvisnosti
 npm install
 
-# Generiraj Prisma klienta
+# Generiraj Prisma klienta in ustvari tabele
 npm run db:generate
-
-# Ustvari tabele v bazi
 npx prisma db push
-
-# (Neobvezno) Napolni bazo z demo podatki
-npm run db:seed
 
 # Zaženi razvojni strežnik
 npm run dev
@@ -232,55 +164,7 @@ npm run dev
 
 ---
 
-## Okoljske spremenljivke
-
-### Backend — ustvari datoteko `.env` v mapi `budgetwise-backend/`:
-
-```env
-# Podatkovna baza
-DATABASE_URL="postgresql://user:password@localhost:5432/budgetwise_db"
-
-# JWT
-JWT_ACCESS_SECRET="tvoj-access-tajen-kljuc"
-JWT_REFRESH_SECRET="tvoj-refresh-tajen-kljuc"
-JWT_ACCESS_EXPIRES_IN="15m"
-JWT_REFRESH_EXPIRES_IN="30d"
-
-# Groq AI
-GROQ_API_KEY="gsk_xxxxxxxxxxxxxxxxxxxx"
-
-# Cloudinary (za profilne slike)
-CLOUDINARY_CLOUD_NAME="tvoj-cloud-name"
-CLOUDINARY_API_KEY="tvoj-api-key"
-CLOUDINARY_API_SECRET="tvoj-api-secret"
-
-# Strežnik
-PORT=3000
-NODE_ENV=development
-
-# CORS (naštej dovoljene izvore, ločene z vejico)
-ALLOWED_ORIGINS="http://localhost:8081,exp://192.168.x.x:8081,http://192.168.x.x:8081"
-
-# Rate limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX=100
-AUTH_RATE_LIMIT_MAX=10
-AI_RATE_LIMIT_MAX=20
-```
-
-### Frontend — ustvari datoteko `.env` v mapi `budgetwise-frontend/`:
-
-```env
-EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api/v1
-```
-
-> **Opomba:** Zamenjaj `192.168.x.x` z lokalnim IP naslovom svojega računalnika (`ipconfig` na Windows, `ifconfig` na macOS/Linux).
-
----
-
 ## Zagon
-
-### Razvojno okolje
 
 ```bash
 # Terminal 1 — backend
@@ -292,50 +176,38 @@ cd budgetwise-frontend
 npm start
 ```
 
-### Produkcija
-
-```bash
-# Backend build
-cd budgetwise-backend
-npm run build
-npm start
-
-# Ali z Dockerjem
-docker-compose -f docker-compose.yml up -d
-```
 ---
 
-## Podatkovna baza
+## Struktura projekta
 
-Aplikacija uporablja **PostgreSQL** s Prisma ORM.
-
-### Modeli
-
-- **User** — uporabniški račun (email, geslo, valuta, časovni pas, profilna slika)
-- **RefreshToken** — JWT refresh tokeni z revokacijo
-- **Category** — kategorije transakcij (Hrana, Prevoz, Zabava...)
-- **Transaction** — prihodki in odhodki z metapodatki
-- **Budget** — proračuni po kategorijah (dnevni / tedenski / mesečni)
-- **Goal** — varčevalni cilji s ciljnim zneskom in rokom
-- **Notification** — obvestila (budget alert, goal reminder...)
-- **AiChat** — zgodovina AI klepeta
-- **Report** — predpomnjene analitike
-
-### Upravljanje baze
-
-```bash
-# Ustvari / posodobi tabele v bazi
-npx prisma db push
-
-# Odpri Prisma Studio (vizualni pregled baze)
-npm run db:studio
-
-# Napolni z demo podatki
-npm run db:seed
-
-# Produkcijska migracija (brez interaktivnih vprašanj)
-npm run db:migrate:prod
 ```
+BudgetWise/
+├── budgetwise-frontend/        # React Native (Expo) aplikacija
+│   ├── app/                    # Zasloni in navigacija (Expo Router)
+│   ├── assets/                 # Ikone, pisave
+│   ├── components/             # UI komponente in grafi
+│   ├── contexts/               # Auth in Theme konteksti
+│   ├── lib/                    # API klient (Axios)
+│   ├── types/                  # TypeScript tipi
+│   └── .env.example            # Predloga za okoljske spremenljivke
+│
+└── budgetwise-backend/         # Node.js + Express REST API
+    ├── src/                    # Izvorna koda (controllers, routes, lib...)
+    ├── prisma/                 # Podatkovni model (schema.prisma)
+    ├── Dockerfile
+    ├── docker-compose.yml
+    └── .env.example            # Predloga za okoljske spremenljivke
+```
+
+Podrobna struktura backenda je v [dokumentaciji backenda](./budgetwise-backend/README.md#struktura).
+
+---
+
+## Dokumentacija backenda
+
+API endpointi, podatkovni model in podrobna navodila za zagon backenda so dokumentirani ločeno:
+
+**➡️ [budgetwise-backend/README.md](./budgetwise-backend/README.md)**
 
 ---
 
