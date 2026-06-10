@@ -20,7 +20,9 @@ export default function SocialAuthButtons() {
   const { loginWithGoogle } = useAuth();
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
 
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'budgetwise' });
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: __DEV__ ? undefined : 'budgetwise',
+  });
 
   const [_request, response, promptAsync] = Google.useAuthRequest({
     iosClientId:     process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
