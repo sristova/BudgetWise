@@ -64,7 +64,7 @@ export default function SocialAuthButtons() {
 
       <TouchableOpacity
         style={styles.button}
-        onPress={() => promptAsync()}
+        onPress={() => Alert.alert('Kmalu na voljo 🚀', 'Google prijava bo kmalu na voljo.')}        
         disabled={loadingProvider === 'google'}
         activeOpacity={0.75}
       >
