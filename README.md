@@ -1,5 +1,6 @@
 # BudgetWise 💰
 [![Download APK](https://img.shields.io/badge/Download-APK-brightgreen?logo=android)](https://github.com/sristova/BudgetWise/releases/latest/download/BudgetWise.apk)
+[![Prijavi problem](https://img.shields.io/badge/Prijavi_problem-EA4335?style=flat&logo=gmail&logoColor=white)](mailto:budgetwiseofficial@gmail.com)
 
 Mobilna aplikacija za upravljanje osebnih financ, zgrajena z **React Native (Expo)** in **Node.js backendom**. Omogoča sledenje transakcijam, varčevalnim ciljem, mesečnim poročilom in AI finančnemu asistentu — vse na enem mestu.
 
