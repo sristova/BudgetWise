@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import * as AuthSession from 'expo-auth-session';
 import { useAuth } from '@/contexts/AuthContext';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -19,11 +20,14 @@ export default function SocialAuthButtons() {
   const { loginWithGoogle } = useAuth();
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
 
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'budgetwise' });
+
   const [_request, response, promptAsync] = Google.useAuthRequest({
     iosClientId:     process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID,
     webClientId:     process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
     responseType:    'id_token',
+    redirectUri,
   });
 
   const handleGoogleCallback = async (idToken: string) => {
