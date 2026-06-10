@@ -1,4 +1,5 @@
 # BudgetWise 💰
+[![Download APK](https://img.shields.io/badge/Download-APK-brightgreen?logo=android)](https://github.com/sristova/BudgetWise/releases/latest/download/BudgetWise.apk)
 
 Mobilna aplikacija za upravljanje osebnih financ, zgrajena z **React Native (Expo)** in **Node.js backendom**. Omogoča sledenje transakcijam, varčevalnim ciljem, mesečnim poročilom in AI finančnemu asistentu — vse na enem mestu.
 
@@ -36,42 +37,80 @@ Mobilna aplikacija za upravljanje osebnih financ, zgrajena z **React Native (Exp
 
 ---
 
-## Arhitektura
+## Struktura projekta
 
 ```
 BudgetWise/
-├── budgetwise-frontend/            # React Native / Expo aplikacija
-│   ├── app/                        # Expo Router zasloni
-│   │   └── (tabs)/                 # Tab navigacija
-│   │       ├── index.tsx           # Domov (finančni pregled + profil modal)
-│   │       ├── transactions.tsx    # Transakcije + skeniranje računov
-│   │       ├── goals.tsx           # Varčevalni cilji
-│   │       ├── assistant.tsx       # AI finančni asistent
-│   │       ├── report.tsx          # Mesečno / letno poročilo
-│   │       └── profile.tsx         # Profil (nastavitve)
+├── budgetwise-frontend/
+│   ├── app/
+│   │   ├── (tabs)/
+│   │   │   ├── _layout.tsx         # Tab navigacija (ikone, barve)
+│   │   │   ├── index.tsx           # Domov — finančni pregled + profil modal
+│   │   │   ├── transactions.tsx    # Transakcije + skeniranje
+│   │   │   ├── goals.tsx           # Varčevalni cilji
+│   │   │   ├── assistant.tsx       # AI klepet (Groq)
+│   │   │   ├── report.tsx          # Mesečno / letno poročilo
+│   │   │   └── profile.tsx         # Profil in nastavitve
+│   │   ├── _layout.tsx             # Root layout + auth gating
+│   │   ├── welcome.tsx             # Uvodni zaslon
+│   │   ├── login.tsx               # Prijava
+│   │   ├── register.tsx            # Registracija
+│   │   └── +not-found.tsx          # 404 stran
+│   ├── assets/                     # Ikone, pisave
 │   ├── components/
-│   │   └── statistics/             # Komponente za grafe in statistike
+│   │   ├── SocialAuthButtons.tsx   # Google / Facebook prijava
+│   │   └── statistics/             # Komponente za grafe
+│   │       ├── CategoryBar.tsx
+│   │       ├── CategoryPieChart.tsx
+│   │       ├── StatCard.tsx
+│   │       ├── StatisticsSkeleton.tsx
+│   │       ├── TrendChart.tsx
+│   │       └── index.ts
 │   ├── contexts/
-│   │   ├── AuthContext.tsx         # Upravljanje avtentikacije
+│   │   ├── AuthContext.tsx         # Upravljanje seje in uporabnika
 │   │   └── ThemeContext.tsx        # Temni / svetli način
 │   ├── lib/
-│   │   ├── api.ts                  # Axios instanca + token interceptorji
+│   │   ├── api.ts                  # Axios + interceptorji za token refresh
 │   │   └── reportsApi.ts           # API klici za poročila
-│   └── types/
-│       └── report.ts               # TypeScript tipi za poročila
-└── budgetwise-backend/             # Node.js / Express API
+│   ├── types/
+│   │   └── report.ts               # TypeScript tipi za poročila
+│   ├── .env                        # EXPO_PUBLIC_API_URL
+│   ├── app.json                    # Expo konfiguracija
+│   ├── package.json
+│   └── tsconfig.json
+└── budgetwise-backend/
     ├── src/
-    │   ├── controllers/            # Logika za vsak endpoint
-    │   ├── routes/                 # Express routerji
-    │   ├── middleware/             # Auth, rate limit, error handling
-    │   ├── lib/                    # Prisma, JWT, logger, response helpers
+    │   ├── controllers/            # aiChat, auth, budget, category,
+    │   │                           #   goal, notification, report,
+    │   │                           #   transaction, user
+    │   ├── routes/                 # Express routerji za vsak modul
+    │   ├── middleware/
+    │   │   ├── authenticate.ts     # JWT preverjanje
+    │   │   ├── errorHandler.ts     # Centralno lovljenje napak
+    │   │   ├── notFound.ts         # 404 handler
+    │   │   └── rateLimit.ts        # Globalni rate limiter
+    │   ├── lib/
+    │   │   ├── prisma.ts           # Singleton Prisma klient
+    │   │   ├── jwt.ts              # Podpisovanje / preverjanje tokenov
+    │   │   ├── logger.ts           # Pino logger
+    │   │   ├── errors.ts           # Prilagojeni razredi napak
+    │   │   ├── response.ts         # Standardizirani API odgovori
+    │   │   ├── socialAuth.ts       # Google / Facebook OAuth
+    │   │   └── tokenService.ts     # Upravljanje refresh tokenov
+    │   ├── config/
+    │   │   └── cloudinary.ts       # Cloudinary konfiguracija
     │   ├── services/
     │   │   └── report.service.ts   # Poslovna logika za poročila
-    │   └── validators/             # Zod validacijske sheme
-    ├── prisma/
-    │   └── schema.prisma           # Podatkovni model (PostgreSQL)
+    │   ├── validators/             # Zod sheme za vhodne podatke
+    │   ├── types/
+    │   │   └── report.types.ts     # TypeScript tipi za poročila
+    │   ├── app.ts                  # Express konfiguracija
+    │   └── server.ts               # Vstopna točka
+    ├── prisma/schema.prisma        # Podatkovni model
+    ├── .env                        # Okoljske spremenljivke
     ├── Dockerfile
-    └── docker-compose.yml
+    ├── docker-compose.yml          # PostgreSQL + API
+    └── tsconfig.json
 ```
 
 **Komunikacija:** Expo mobilna aplikacija ↔ REST API (`/api/v1`) ↔ PostgreSQL + Groq AI
@@ -374,84 +413,6 @@ npm run db:seed
 
 # Produkcijska migracija (brez interaktivnih vprašanj)
 npm run db:migrate:prod
-```
-
----
-
-## Struktura projekta
-
-```
-BudgetWise/
-├── budgetwise-frontend/
-│   ├── app/
-│   │   ├── (tabs)/
-│   │   │   ├── _layout.tsx         # Tab navigacija (ikone, barve)
-│   │   │   ├── index.tsx           # Domov — finančni pregled + profil modal
-│   │   │   ├── transactions.tsx    # Transakcije + skeniranje
-│   │   │   ├── goals.tsx           # Varčevalni cilji
-│   │   │   ├── assistant.tsx       # AI klepet (Groq)
-│   │   │   ├── report.tsx          # Mesečno / letno poročilo
-│   │   │   └── profile.tsx         # Profil in nastavitve
-│   │   ├── _layout.tsx             # Root layout + auth gating
-│   │   ├── welcome.tsx             # Uvodni zaslon
-│   │   ├── login.tsx               # Prijava
-│   │   ├── register.tsx            # Registracija
-│   │   └── +not-found.tsx          # 404 stran
-│   ├── assets/                     # Ikone, pisave
-│   ├── components/
-│   │   ├── SocialAuthButtons.tsx   # Google / Facebook prijava
-│   │   └── statistics/             # Komponente za grafe
-│   │       ├── CategoryBar.tsx
-│   │       ├── CategoryPieChart.tsx
-│   │       ├── StatCard.tsx
-│   │       ├── StatisticsSkeleton.tsx
-│   │       ├── TrendChart.tsx
-│   │       └── index.ts
-│   ├── contexts/
-│   │   ├── AuthContext.tsx         # Upravljanje seje in uporabnika
-│   │   └── ThemeContext.tsx        # Temni / svetli način
-│   ├── lib/
-│   │   ├── api.ts                  # Axios + interceptorji za token refresh
-│   │   └── reportsApi.ts           # API klici za poročila
-│   ├── types/
-│   │   └── report.ts               # TypeScript tipi za poročila
-│   ├── .env                        # EXPO_PUBLIC_API_URL
-│   ├── app.json                    # Expo konfiguracija
-│   ├── package.json
-│   └── tsconfig.json
-└── budgetwise-backend/
-    ├── src/
-    │   ├── controllers/            # aiChat, auth, budget, category,
-    │   │                           #   goal, notification, report,
-    │   │                           #   transaction, user
-    │   ├── routes/                 # Express routerji za vsak modul
-    │   ├── middleware/
-    │   │   ├── authenticate.ts     # JWT preverjanje
-    │   │   ├── errorHandler.ts     # Centralno lovljenje napak
-    │   │   ├── notFound.ts         # 404 handler
-    │   │   └── rateLimit.ts        # Globalni rate limiter
-    │   ├── lib/
-    │   │   ├── prisma.ts           # Singleton Prisma klient
-    │   │   ├── jwt.ts              # Podpisovanje / preverjanje tokenov
-    │   │   ├── logger.ts           # Pino logger
-    │   │   ├── errors.ts           # Prilagojeni razredi napak
-    │   │   ├── response.ts         # Standardizirani API odgovori
-    │   │   ├── socialAuth.ts       # Google / Facebook OAuth
-    │   │   └── tokenService.ts     # Upravljanje refresh tokenov
-    │   ├── config/
-    │   │   └── cloudinary.ts       # Cloudinary konfiguracija
-    │   ├── services/
-    │   │   └── report.service.ts   # Poslovna logika za poročila
-    │   ├── validators/             # Zod sheme za vhodne podatke
-    │   ├── types/
-    │   │   └── report.types.ts     # TypeScript tipi za poročila
-    │   ├── app.ts                  # Express konfiguracija
-    │   └── server.ts               # Vstopna točka
-    ├── prisma/schema.prisma        # Podatkovni model
-    ├── .env                        # Okoljske spremenljivke
-    ├── Dockerfile
-    ├── docker-compose.yml          # PostgreSQL + API
-    └── tsconfig.json
 ```
 
 ---
