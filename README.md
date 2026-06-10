@@ -139,6 +139,34 @@ Odpri Expo Go na telefonu in skeniraj QR kodo.
 >
 > **Opomba glede OneDrive:** Projekta ne hrani v mapi, ki jo sinhronizira OneDrive — to lahko poškoduje `node_modules`. Uporabi lokalno pot, npr. `C:\Dev\BudgetWise\`.
 
+#### Ključne odvisnosti (frontend)
+
+Vse odvisnosti so navedene v `package.json` in se namestijo z enim `npm install`. Spodaj so naštete glavne knjižnice, ki jih projekt uporablja:
+
+```bash
+# Navigacija in jedro
+npx expo install expo-router expo-constants expo-linking expo-splash-screen expo-status-bar
+
+# Avtentikacija (Google prijava)
+npx expo install expo-auth-session expo-crypto expo-web-browser expo-secure-store
+
+# Skeniranje računov (kamera / slike)
+npx expo install expo-image-picker expo-image-manipulator expo-file-system
+
+# UI in animacije
+npx expo install expo-linear-gradient expo-font @expo/vector-icons react-native-reanimated react-native-worklets react-native-svg react-native-screens react-native-safe-area-context
+
+# Grafi
+npm install react-native-chart-kit
+
+# Omrežje in shramba
+npm install axios
+npx expo install @react-native-async-storage/async-storage
+
+# Razvoj / build
+npx expo install expo-dev-client expo-sharing
+```
+
 ---
 
 ### Backend (Node.js)

@@ -65,6 +65,39 @@ npm run db:seed
 npm run dev
 ```
 
+### Ključne odvisnosti (backend)
+
+Vse odvisnosti so navedene v `package.json` in se namestijo z enim `npm install`. Spodaj so naštete glavne knjižnice po namenu:
+
+```bash
+# Strežnik in jedro
+npm install express express-async-errors compression cors helmet morgan
+
+# Podatkovna baza (Prisma + PostgreSQL)
+npm install @prisma/client prisma
+
+# Avtentikacija (JWT + Google)
+npm install jsonwebtoken bcryptjs google-auth-library jwks-rsa
+
+# Validacija
+npm install zod express-validator
+
+# E-pošta in obvestila
+npm install @sendgrid/mail
+
+# Nalaganje slik (avatari)
+npm install cloudinary multer
+
+# Pomožno
+npm install dotenv uuid ioredis node-cron pdfkit
+
+# Logiranje
+npm install pino pino-http pino-pretty
+
+# Razvojne odvisnosti (tipi + orodja)
+npm install --save-dev typescript tsx @types/node @types/express @types/jsonwebtoken @types/bcryptjs @types/cors @types/compression @types/morgan @types/multer @types/node-cron @types/pdfkit @types/uuid
+```
+
 ---
 
 ## Okoljske spremenljivke
@@ -119,24 +152,24 @@ Authorization: Bearer <access_token>
 
 ### Avtentikacija
 
-| Metoda | Pot              | Opis                                 |
-| ------ | ---------------- | ------------------------------------ |
-| POST   | `/auth/register` | Registracija novega uporabnika       |
-| POST   | `/auth/login`    | Prijava, vrne access + refresh token |
-| POST   | `/auth/refresh`  | Obnovi access token                  |
-| POST   | `/auth/logout`   | Odjava (razveljavi refresh token)    |
-| POST   | `/auth/google`   | Prijava z Google računom             |
-| POST   | `/auth/facebook` | Prijava s Facebook računom           |
+| Metoda | Pot               | Opis                                     |
+| ------ | ----------------- | ---------------------------------------- |
+| POST   | `/auth/register`  | Registracija novega uporabnika           |
+| POST   | `/auth/login`     | Prijava, vrne access + refresh token     |
+| POST   | `/auth/refresh`   | Obnovi access token                      |
+| POST   | `/auth/logout`    | Odjava (razveljavi refresh token)        |
+| POST   | `/auth/google`    | Prijava z Google računom                 |
+| POST   | `/auth/facebook`  | Prijava s Facebook računom               |
 
 ### Uporabnik
 
-| Metoda | Pot                      | Opis                      |
-| ------ | ------------------------ | ------------------------- |
-| GET    | `/users/profile`         | Pridobi profil uporabnika |
-| PATCH  | `/users/profile`         | Posodobi ime in priimek   |
-| POST   | `/users/upload-avatar`   | Naloži profilno sliko     |
-| POST   | `/users/change-password` | Spremeni geslo            |
-| DELETE | `/users/account`         | Izbriši račun             |
+| Metoda | Pot                      | Opis                       |
+| ------ | ------------------------ | -------------------------- |
+| GET    | `/users/profile`         | Pridobi profil uporabnika  |
+| PATCH  | `/users/profile`         | Posodobi ime in priimek    |
+| POST   | `/users/upload-avatar`   | Naloži profilno sliko      |
+| POST   | `/users/change-password` | Spremeni geslo             |
+| DELETE | `/users/account`         | Izbriši račun              |
 
 ### Transakcije
 
